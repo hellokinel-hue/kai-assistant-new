@@ -420,7 +420,12 @@ for message in st.session_state.messages:
             """,
             unsafe_allow_html=True,
         )
-        st.markdown(message["content"], unsafe_allow_html=True) 
+        # Check if message contains a saved PIL image object reference or markdown
+        if isinstance(message.get("image_obj"), Image.Image):
+            st.markdown(message["content"])
+            st.image(message["image_obj"], use_container_width=True)
+        else:
+            st.markdown(message["content"], unsafe_allow_html=True) 
 
 # -----------------------------------------------------------------------------
 # 7. ATTACH BUTTON INJECTION
@@ -548,6 +553,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
             ai_reply = f"Connection failed. Please check your API key configuration. Details: {str(e)}"
             message_placeholder.markdown(ai_reply)
 
+    generated_img_obj = None
     if "[GENERATE_IMAGE:" in ai_reply:
         match = re.search(r"\[GENERATE_IMAGE:\s*(.*?)\]", ai_reply, re.DOTALL)
         if match:
@@ -596,18 +602,18 @@ if prompt := st.chat_input("Ask KAI anything..."):
                             draw.text((x+offset_x, y+offset_y), text, font=font, fill="black")
                     draw.text((x, y), text, font=font, fill="white")
                     
-                    buffered = io.BytesIO()
-                    img.save(buffered, format="PNG")
-                    img_str = base64.b64encode(buffered.getvalue()).decode()
-                    
-                    img_html = f'<br><br><img src="data:image/png;base64,{img_str}" style="border-radius: 12px; max-width: 100%; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">'
-                    ai_reply += img_html
+                    generated_img_obj = img
+                    message_placeholder.markdown(ai_reply)
+                    st.image(generated_img_obj, use_container_width=True)
                 else:
                     ai_reply += "\n\n*(Error: The image forge is currently resting. Try again later.)*"
+                    message_placeholder.markdown(ai_reply)
             except requests.exceptions.Timeout:
                 ai_reply += "\n\n*(Image Generation Error: The image server is currently busy and timed out. Please try again!)*"
+                message_placeholder.markdown(ai_reply)
             except Exception as e:
                 ai_reply += "\n\n*(Image Generation Error: The image service is temporarily unavailable.)*"
+                message_placeholder.markdown(ai_reply)
 
     check_reply = ai_reply.lower().replace("’", "'")
     forbidden_identities = [
@@ -620,6 +626,9 @@ if prompt := st.chat_input("Ask KAI anything..."):
         pattern = re.compile('|'.join(re.escape(phrase) for phrase in forbidden_identities), re.IGNORECASE)
         ai_reply = pattern.sub("a digital assistant", ai_reply)
 
-    message_placeholder.markdown(ai_reply, unsafe_allow_html=True)
-    st.session_state.messages.append({"role": "assistant", "content": ai_reply})
+    if generated_img_obj:
+        st.session_state.messages.append({"role": "assistant", "content": ai_reply, "image_obj": generated_img_obj})
+    else:
+        st.session_state.messages.append({"role": "assistant", "content": ai_reply})
+        
     save_message(st.session_state.logged_in_user, "assistant", ai_reply, st.session_state.current_session_id)
