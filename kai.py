@@ -8,6 +8,7 @@ import uuid
 import html
 import base64
 import io
+import random
 import requests
 from PIL import Image, ImageDraw, ImageFont
 from groq import Groq  
@@ -247,7 +248,6 @@ st.markdown(
         background-color: #333537 !important; color: #e3e3e3 !important; border-color: transparent !important;
     }
 
-    /* CENTERED RADIO BUTTONS FOR MODEL TOGGLE */
     .stRadio > div { justify-content: center !important; }
     </style>
     """,
@@ -366,8 +366,6 @@ with st.sidebar:
 # -----------------------------------------------------------------------------
 # 6. MAIN CHAT UI, GREETING & MODEL TOGGLE
 # -----------------------------------------------------------------------------
-
-# --- AI Model Toggle on Front Page (Locked to Pro by default) ---
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     st.session_state.kai_mode = st.radio(
@@ -397,7 +395,7 @@ if not st.session_state.messages:
         unsafe_allow_html=True,
     )
 
-for message in st.session_state.messages:
+for idx, message in enumerate(st.session_state.messages):
     if message["role"] == "user":
         safe_text = html.escape(message["content"]).replace("\n", "<br>")
         st.markdown(
@@ -423,6 +421,19 @@ for message in st.session_state.messages:
         if isinstance(message.get("image_obj"), Image.Image):
             st.markdown(message["content"])
             st.image(message["image_obj"], use_container_width=True)
+            
+            # Convert PIL image to bytes for download button
+            buf = io.BytesIO()
+            message["image_obj"].save(buf, format="PNG")
+            byte_im = buf.getvalue()
+            
+            st.download_button(
+                label="📥 Download Image",
+                data=byte_im,
+                file_name="kai_generated_image.png",
+                mime="image/png",
+                key=f"download_history_{idx}"
+            )
         else:
             st.markdown(message["content"], unsafe_allow_html=True) 
 
@@ -446,7 +457,6 @@ if prompt := st.chat_input("Ask KAI anything..."):
     api_content = prompt
     display_content = prompt
     
-    # --- LOCKED PERMANENTLY TO HIGHEST QUALITY PRO MODEL ---
     model_to_use = "llama-3.3-70b-versatile"
     
     if 'uploaded_file' in locals() and uploaded_file is not None:
@@ -559,10 +569,20 @@ if prompt := st.chat_input("Ask KAI anything..."):
             
             try:
                 safe_img_prompt = urllib.parse.quote(image_prompt)
-                url = f"https://image.pollinations.ai/prompt/{safe_img_prompt}?nologo=true&enhance=true&model=flux"
-                res = requests.get(url, timeout=30)
+                unique_seed = random.randint(1, 1000000)
+                url = f"https://image.pollinations.ai/prompt/{safe_img_prompt}?nologo=true&enhance=true&model=flux&seed={unique_seed}"
                 
-                if res.status_code == 200:
+                # Robust Multi-Attempt Fallback Loop to prevent timeouts
+                res = None
+                for attempt in range(3):
+                    try:
+                        res = requests.get(url, timeout=30)
+                        if res.status_code == 200:
+                            break
+                    except Exception:
+                        pass
+                
+                if res and res.status_code == 200:
                     img = Image.open(io.BytesIO(res.content))
                     draw = ImageDraw.Draw(img)
                     
@@ -601,6 +621,17 @@ if prompt := st.chat_input("Ask KAI anything..."):
                     generated_img_obj = img
                     message_placeholder.markdown(ai_reply)
                     st.image(generated_img_obj, use_container_width=True)
+                    
+                    # Direct download button for newly generated image
+                    buf = io.BytesIO()
+                    generated_img_obj.save(buf, format="PNG")
+                    st.download_button(
+                        label="📥 Download Image",
+                        data=buf.getvalue(),
+                        file_name="kai_generated_image.png",
+                        mime="image/png",
+                        key=f"download_current_{str(uuid.uuid4())}"
+                    )
                 else:
                     ai_reply += "\n\n*(Error: The image forge is currently resting. Try again later.)*"
                     message_placeholder.markdown(ai_reply)
