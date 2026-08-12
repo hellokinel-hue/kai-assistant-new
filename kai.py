@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 from groq import Groq  
 
 # -----------------------------------------------------------------------------
-# 1. DATABASE SETUP & SECURITY (Thread-Safe, Salted & OneDrive-Safe)
+# 1. DATABASE SETUP & SECURITY
 # -----------------------------------------------------------------------------
 LOCAL_DB_DIR = os.path.expanduser("~/.kai_data")
 os.makedirs(LOCAL_DB_DIR, exist_ok=True)
@@ -137,7 +137,7 @@ def save_message(email, role, content, session_id):
         update_chat_timestamp(session_id)
 
 # -----------------------------------------------------------------------------
-# 2. PAGE CONFIG & FIXED UI OVERRIDES
+# 2. PAGE CONFIG & AGGRESSIVE CSS OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="KAI", page_icon="✦", layout="centered", initial_sidebar_state="expanded")
 
@@ -185,7 +185,7 @@ st.markdown(
     /* CHAT INPUT STYLING */
     [data-testid="stChatInput"] {
         background-color: #1e1f20 !important; border: 1px solid #333537 !important;
-        border-radius: 32px !important; padding: 0.2rem 0.8rem 0.2rem 3.5rem !important;
+        border-radius: 32px !important; padding: 0.2rem 0.8rem 0.2rem 3.5rem !important; 
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
     }
     [data-testid="stChatInput"] * {
@@ -202,7 +202,7 @@ st.markdown(
 
     [data-testid="stSidebar"] { background-color: #131314 !important; border-right: 1px solid #282a2c !important; }
     
-    /* POPOVER & BUTTON FIXES (Using descendant selectors to catch wrapper divs) */
+    /* POPOVER STYLES */
     div[data-testid="stPopover"] button {
         background-color: #1e1f20 !important; color: #e3e3e3 !important; border: 1px solid #333537 !important;
         border-radius: 24px !important; padding: 0.35rem 1.2rem !important; font-weight: 600 !important;
@@ -216,23 +216,35 @@ st.markdown(
         border-radius: 16px !important; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8) !important;
     }
     
-    /* TOP-RIGHT PROFILE / SIGN IN ABSOLUTE ANCHOR */
+    /* TOP-RIGHT PROFILE / SIGN IN */
     .st-key-profile_popover, .st-key-login_popover {
         position: fixed !important; top: 1.2rem !important; right: 1.5rem !important; z-index: 999999 !important;
     }
     
-    /* ATTACH (+) BUTTON NESTLED INSIDE CHAT BAR */
+    /* BULLETPROOF ATTACH (+) BUTTON POSITIONING */
     .st-key-attach_popover {
-        position: fixed !important; bottom: 25px !important; left: max(calc(50% - 355px), 1.2rem) !important; z-index: 999999 !important;
+        position: fixed !important; 
+        bottom: 27px !important; 
+        left: 50% !important; 
+        margin-left: -375px !important;
+        z-index: 9999999 !important;
     }
+    
+    @media (max-width: 780px) {
+        .st-key-attach_popover {
+            left: 20px !important;
+            margin-left: 0 !important;
+        }
+    }
+
     .st-key-attach_popover button {
         background: transparent !important; color: #8e9196 !important; border: none !important;
-        width: 38px !important; height: 38px !important; border-radius: 50% !important;
-        font-size: 1.1rem !important; padding: 0 !important; box-shadow: none !important;
+        width: 40px !important; height: 40px !important; border-radius: 50% !important;
+        font-size: 1.4rem !important; padding: 0 !important; box-shadow: none !important;
         display: flex !important; align-items: center !important; justify-content: center !important;
     }
     .st-key-attach_popover button:hover {
-        background-color: #282a2c !important; color: #e3e3e3 !important; border-color: transparent !important;
+        background-color: #333537 !important; color: #e3e3e3 !important; border-color: transparent !important;
     }
     </style>
     """,
@@ -245,15 +257,15 @@ st.markdown(
 if "logged_in_user" not in st.session_state: st.session_state.logged_in_user = None
 if "messages" not in st.session_state: st.session_state.messages = []
 if "current_session_id" not in st.session_state: st.session_state.current_session_id = str(uuid.uuid4())
+if "kai_mode" not in st.session_state: st.session_state.kai_mode = "⚡ Fast (Standard)"
 
 # -----------------------------------------------------------------------------
-# 4. TOP-RIGHT AUTHENTICATION / PROFILE CONTAINER
+# 4. TOP-RIGHT AUTHENTICATION / PROFILE
 # -----------------------------------------------------------------------------
 if st.session_state.logged_in_user:
     safe_email = urllib.parse.quote(st.session_state.logged_in_user)
     avatar_url = f"https://unavatar.io/{safe_email}"
     
-    # Inject dynamic avatar image background into the profile button
     st.markdown(
         f"""
         <style>
@@ -320,9 +332,18 @@ else:
                     else: st.error("Check email format and password length.")
 
 # -----------------------------------------------------------------------------
-# 5. SIDEBAR: CHAT HISTORY
+# 5. SIDEBAR: CHAT HISTORY & SETTINGS
 # -----------------------------------------------------------------------------
 with st.sidebar:
+    st.markdown("### ⚙️ KAI Settings")
+    st.session_state.kai_mode = st.radio(
+        "Intelligence Level",
+        ["⚡ Fast (Standard)", "🧠 Smart (Advanced)"],
+        index=0 if st.session_state.kai_mode == "⚡ Fast (Standard)" else 1,
+        help="Fast uses a smaller, quicker model. Smart uses a much larger model for complex reasoning."
+    )
+    
+    st.markdown("---")
     st.markdown("### 💬 Chat History")
     
     if st.session_state.logged_in_user:
@@ -393,7 +414,7 @@ for message in st.session_state.messages:
         st.markdown(message["content"], unsafe_allow_html=True) 
 
 # -----------------------------------------------------------------------------
-# 7. ATTACH BUTTON & CHAT INPUT HANDLER
+# 7. ATTACH BUTTON INJECTION
 # -----------------------------------------------------------------------------
 with st.container():
     with st.popover("➕", key="attach_popover"):
@@ -405,10 +426,18 @@ with st.container():
         if uploaded_file:
             st.success(f"Attached: {uploaded_file.name}")
 
+# -----------------------------------------------------------------------------
+# 8. CHAT INPUT HANDLER & MODEL SELECTION
+# -----------------------------------------------------------------------------
 if prompt := st.chat_input("Ask KAI anything..."):
     api_content = prompt
     display_content = prompt
-    model_to_use = "llama-3.1-8b-instant"
+    
+    # --- DYNAMIC MODEL SELECTION ---
+    if st.session_state.kai_mode == "⚡ Fast (Standard)":
+        model_to_use = "llama-3.1-8b-instant"
+    else:
+        model_to_use = "llama-3.3-70b-versatile" # The smart, highly capable model
     
     if 'uploaded_file' in locals() and uploaded_file is not None:
         file_ext = uploaded_file.name.lower().split('.')[-1]
@@ -420,8 +449,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}}
             ]
             display_content = f"*[Attached Image: {uploaded_file.name}]*\n\n{prompt}"
-            # Updated to current active vision-capable model
-            model_to_use = "qwen/qwen3.6-27b"
+            model_to_use = "qwen/qwen3.6-27b" # Forces the vision model if an image is uploaded
         else:
             try:
                 file_text = uploaded_file.getvalue().decode('utf-8')
@@ -480,12 +508,16 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 "You are simply KAI. If asked who made you, say 'Kinel de Silva'.\n\n"
                 "IMAGE GENERATION: You have the ability to generate images infinitely. If the user asks you to create, generate, draw, or show a picture/image, "
                 "you MUST include the following tag anywhere in your response: [GENERATE_IMAGE: <detailed visual description of the image>] . "
-                "Make the description inside the tag highly detailed for the best artistic result."
+                "Make the description inside the tag highly detailed for the best artistic result. "
+                "CRITICAL INSTRUCTION: NEVER output standard markdown image links like ![alt](url). ONLY use the [GENERATE_IMAGE:] tag."
             )
             
             full_messages = [{"role": "system", "content": ultra_strict_system_prompt}]
+            
             for msg in st.session_state.messages[:-1]: 
-                full_messages.append({"role": msg["role"], "content": msg["content"]})
+                clean_content = re.sub(r'<br><br><img src="data:image[^>]+>', '\n\n*[Previous Image Generated Here]*', msg["content"])
+                full_messages.append({"role": msg["role"], "content": clean_content})
+                
             full_messages.append({"role": "user", "content": api_content})
             
             client = Groq(api_key=st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY"))
@@ -523,9 +555,24 @@ if prompt := st.chat_input("Ask KAI anything..."):
                     img = Image.open(io.BytesIO(res.content))
                     draw = ImageDraw.Draw(img)
                     
-                    text = "KAI"
-                    font = ImageFont.load_default()
+                    font_path = os.path.join(LOCAL_DB_DIR, "Roboto-Black.ttf")
+                    if not os.path.exists(font_path):
+                        try:
+                            font_url = "https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Black.ttf"
+                            r = requests.get(font_url, allow_redirects=True)
+                            open(font_path, 'wb').write(r.content)
+                        except Exception:
+                            pass
                     
+                    try:
+                        font = ImageFont.truetype(font_path, 85)
+                    except Exception:
+                        try:
+                            font = ImageFont.truetype("arial.ttf", 85)
+                        except Exception:
+                            font = ImageFont.load_default()
+                    
+                    text = "KAI"
                     try:
                         bbox = draw.textbbox((0, 0), text, font=font)
                         tw = bbox[2] - bbox[0]
@@ -533,10 +580,11 @@ if prompt := st.chat_input("Ask KAI anything..."):
                     except AttributeError:
                         tw, th = draw.textsize(text, font=font)
                     
-                    x, y = img.size[0] - tw - 15, img.size[1] - th - 15
+                    x, y = img.size[0] - tw - 30, img.size[1] - th - 30
                     
-                    for offset in [(1,1), (-1,-1), (1,-1), (-1,1)]:
-                        draw.text((x+offset[0], y+offset[1]), text, font=font, fill="black")
+                    for offset_x in [-3, -2, -1, 0, 1, 2, 3]:
+                        for offset_y in [-3, -2, -1, 0, 1, 2, 3]:
+                            draw.text((x+offset_x, y+offset_y), text, font=font, fill="black")
                     draw.text((x, y), text, font=font, fill="white")
                     
                     buffered = io.BytesIO()
