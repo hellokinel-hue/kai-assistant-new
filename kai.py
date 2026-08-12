@@ -420,7 +420,6 @@ for message in st.session_state.messages:
             """,
             unsafe_allow_html=True,
         )
-        # Check if message contains a saved PIL image object reference or markdown
         if isinstance(message.get("image_obj"), Image.Image):
             st.markdown(message["content"])
             st.image(message["image_obj"], use_container_width=True)
@@ -580,10 +579,10 @@ if prompt := st.chat_input("Ask KAI anything..."):
                             pass
                     
                     try:
-                        font = ImageFont.truetype(font_path, 85)
+                        font = ImageFont.truetype(font_path, 42)
                     except Exception:
                         try:
-                            font = ImageFont.truetype("arial.ttf", 85)
+                            font = ImageFont.truetype("arial.ttf", 42)
                         except Exception:
                             font = ImageFont.load_default()
                     
@@ -595,10 +594,10 @@ if prompt := st.chat_input("Ask KAI anything..."):
                     except AttributeError:
                         tw, th = draw.textsize(text, font=font)
                     
-                    x, y = img.size[0] - tw - 30, img.size[1] - th - 30
+                    x, y = img.size[0] - tw - 20, img.size[1] - th - 20
                     
-                    for offset_x in [-3, -2, -1, 0, 1, 2, 3]:
-                        for offset_y in [-3, -2, -1, 0, 1, 2, 3]:
+                    for offset_x in [-2, -1, 0, 1, 2]:
+                        for offset_y in [-2, -1, 0, 1, 2]:
                             draw.text((x+offset_x, y+offset_y), text, font=font, fill="black")
                     draw.text((x, y), text, font=font, fill="white")
                     
