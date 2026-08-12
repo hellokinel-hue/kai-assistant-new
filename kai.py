@@ -246,6 +246,9 @@ st.markdown(
     .st-key-attach_popover button:hover {
         background-color: #333537 !important; color: #e3e3e3 !important; border-color: transparent !important;
     }
+
+    /* CENTERED RADIO BUTTONS FOR MODEL TOGGLE */
+    .stRadio > div { justify-content: center !important; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -257,7 +260,7 @@ st.markdown(
 if "logged_in_user" not in st.session_state: st.session_state.logged_in_user = None
 if "messages" not in st.session_state: st.session_state.messages = []
 if "current_session_id" not in st.session_state: st.session_state.current_session_id = str(uuid.uuid4())
-if "kai_mode" not in st.session_state: st.session_state.kai_mode = "⚡ Fast (Standard)"
+if "kai_mode" not in st.session_state: st.session_state.kai_mode = "⚡ Fast"
 
 # -----------------------------------------------------------------------------
 # 4. TOP-RIGHT AUTHENTICATION / PROFILE
@@ -332,18 +335,9 @@ else:
                     else: st.error("Check email format and password length.")
 
 # -----------------------------------------------------------------------------
-# 5. SIDEBAR: CHAT HISTORY & SETTINGS
+# 5. SIDEBAR: CHAT HISTORY ONLY
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("### ⚙️ KAI Settings")
-    st.session_state.kai_mode = st.radio(
-        "Intelligence Level",
-        ["⚡ Fast (Standard)", "🧠 Smart (Advanced)"],
-        index=0 if st.session_state.kai_mode == "⚡ Fast (Standard)" else 1,
-        help="Fast uses a smaller, quicker model. Smart uses a much larger model for complex reasoning."
-    )
-    
-    st.markdown("---")
     st.markdown("### 💬 Chat History")
     
     if st.session_state.logged_in_user:
@@ -370,8 +364,23 @@ with st.sidebar:
         st.info("Please log in to save and view your chat history.")
 
 # -----------------------------------------------------------------------------
-# 6. MAIN CHAT UI & GREETING
+# 6. MAIN CHAT UI, GREETING & MODEL TOGGLE
 # -----------------------------------------------------------------------------
+
+# --- AI Model Toggle on Front Page ---
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    st.session_state.kai_mode = st.radio(
+        "AI Model",
+        ["⚡ Fast", "🧠 Pro"],
+        index=0 if st.session_state.kai_mode == "⚡ Fast" else 1,
+        horizontal=True,
+        label_visibility="collapsed",
+        key="model_toggle"
+    )
+
+st.markdown("<br>", unsafe_allow_html=True)
+
 if not st.session_state.messages:
     greeting_subtext = (
         f"Ready for a new chat, **{st.session_state.logged_in_user}**?" 
@@ -380,7 +389,7 @@ if not st.session_state.messages:
     )
     st.markdown(
         f"""
-        <div style="text-align: center; margin-top: 6vh; margin-bottom: 5vh;">
+        <div style="text-align: center; margin-top: 2vh; margin-bottom: 5vh;">
             <h1 style="font-size: 3.5rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 0.2rem; background: linear-gradient(74deg, #4285f4 0%, #9b72cb 35%, #d96570 70%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Hello, I'm KAI</h1>
             <p style="color: #8e9196; font-size: 1.2rem; font-weight: 500; margin-top: 0;">{greeting_subtext}</p>
         </div>
@@ -434,10 +443,10 @@ if prompt := st.chat_input("Ask KAI anything..."):
     display_content = prompt
     
     # --- DYNAMIC MODEL SELECTION ---
-    if st.session_state.kai_mode == "⚡ Fast (Standard)":
+    if st.session_state.kai_mode == "⚡ Fast":
         model_to_use = "llama-3.1-8b-instant"
     else:
-        model_to_use = "llama-3.3-70b-versatile" # The smart, highly capable model
+        model_to_use = "llama-3.3-70b-versatile" # The smart PRO model
     
     if 'uploaded_file' in locals() and uploaded_file is not None:
         file_ext = uploaded_file.name.lower().split('.')[-1]
