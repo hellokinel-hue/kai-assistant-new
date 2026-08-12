@@ -626,7 +626,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
                     buf = io.BytesIO()
                     generated_img_obj.save(buf, format="PNG")
                     st.download_button(
-                        label="📥 Download Image",
+                        label="⬇️ Download Image",
                         data=buf.getvalue(),
                         file_name="kai_generated_image.png",
                         mime="image/png",
