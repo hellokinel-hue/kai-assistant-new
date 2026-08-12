@@ -446,7 +446,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
     if st.session_state.kai_mode == "⚡ Fast":
         model_to_use = "llama-3.1-8b-instant"
     else:
-        model_to_use = "llama-3.3-70b-versatile" # The smart PRO model
+        model_to_use = "llama-3.3-70b-versatile" # The PRO model
     
     if 'uploaded_file' in locals() and uploaded_file is not None:
         file_ext = uploaded_file.name.lower().split('.')[-1]
@@ -458,7 +458,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}}
             ]
             display_content = f"*[Attached Image: {uploaded_file.name}]*\n\n{prompt}"
-            model_to_use = "qwen/qwen3.6-27b" # Forces the vision model if an image is uploaded
+            model_to_use = "qwen/qwen3.6-27b" # Forces vision model if an image is uploaded
         else:
             try:
                 file_text = uploaded_file.getvalue().decode('utf-8')
@@ -604,15 +604,17 @@ if prompt := st.chat_input("Ask KAI anything..."):
                     ai_reply += img_html
                 else:
                     ai_reply += "\n\n*(Error: The image forge is currently resting. Try again later.)*"
+            except requests.exceptions.Timeout:
+                ai_reply += "\n\n*(Image Generation Error: The image server is currently busy and timed out. Please try again!)*"
             except Exception as e:
-                ai_reply += f"\n\n*(Image Generation Error: {str(e)})*"
+                ai_reply += "\n\n*(Image Generation Error: The image service is temporarily unavailable.)*"
 
     check_reply = ai_reply.lower().replace("’", "'")
     forbidden_identities = [
         "an ai language model", "a language model", "created by openai",
         "developed by openai", "built by openai", "made by openai",
         "created by ai", "made by an ai", "i'm an ai", "i am an ai",
-        "as an ai", "as a language model", "pollinations", "groq"
+        "as an ai", "as a language model", "groq"
     ]
     if any(bad_phrase in check_reply for bad_phrase in forbidden_identities):
         pattern = re.compile('|'.join(re.escape(phrase) for phrase in forbidden_identities), re.IGNORECASE)
