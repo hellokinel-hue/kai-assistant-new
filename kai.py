@@ -260,7 +260,7 @@ st.markdown(
 if "logged_in_user" not in st.session_state: st.session_state.logged_in_user = None
 if "messages" not in st.session_state: st.session_state.messages = []
 if "current_session_id" not in st.session_state: st.session_state.current_session_id = str(uuid.uuid4())
-if "kai_mode" not in st.session_state: st.session_state.kai_mode = "⚡ Fast"
+if "kai_mode" not in st.session_state: st.session_state.kai_mode = "🧠 Pro"
 
 # -----------------------------------------------------------------------------
 # 4. TOP-RIGHT AUTHENTICATION / PROFILE
@@ -367,13 +367,13 @@ with st.sidebar:
 # 6. MAIN CHAT UI, GREETING & MODEL TOGGLE
 # -----------------------------------------------------------------------------
 
-# --- AI Model Toggle on Front Page ---
+# --- AI Model Toggle on Front Page (Locked to Pro by default) ---
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     st.session_state.kai_mode = st.radio(
         "AI Model",
         ["⚡ Fast", "🧠 Pro"],
-        index=0 if st.session_state.kai_mode == "⚡ Fast" else 1,
+        index=1,
         horizontal=True,
         label_visibility="collapsed",
         key="model_toggle"
@@ -446,11 +446,8 @@ if prompt := st.chat_input("Ask KAI anything..."):
     api_content = prompt
     display_content = prompt
     
-    # --- DYNAMIC MODEL SELECTION ---
-    if st.session_state.kai_mode == "⚡ Fast":
-        model_to_use = "llama-3.1-8b-instant"
-    else:
-        model_to_use = "llama-3.3-70b-versatile" # The PRO model
+    # --- LOCKED PERMANENTLY TO HIGHEST QUALITY PRO MODEL ---
+    model_to_use = "llama-3.3-70b-versatile"
     
     if 'uploaded_file' in locals() and uploaded_file is not None:
         file_ext = uploaded_file.name.lower().split('.')[-1]
@@ -462,7 +459,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}}
             ]
             display_content = f"*[Attached Image: {uploaded_file.name}]*\n\n{prompt}"
-            model_to_use = "qwen/qwen3.6-27b" # Forces vision model if an image is uploaded
+            model_to_use = "qwen/qwen3.6-27b"
         else:
             try:
                 file_text = uploaded_file.getvalue().decode('utf-8')
@@ -562,8 +559,8 @@ if prompt := st.chat_input("Ask KAI anything..."):
             
             try:
                 safe_img_prompt = urllib.parse.quote(image_prompt)
-                url = f"https://image.pollinations.ai/prompt/{safe_img_prompt}?nologo=true"
-                res = requests.get(url, timeout=20)
+                url = f"https://image.pollinations.ai/prompt/{safe_img_prompt}?nologo=true&enhance=true&model=flux"
+                res = requests.get(url, timeout=30)
                 
                 if res.status_code == 200:
                     img = Image.open(io.BytesIO(res.content))
