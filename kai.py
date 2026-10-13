@@ -645,40 +645,9 @@ if prompt := st.chat_input("Ask KAI anything..."):
         if match:
             video_prompt = match.group(1).strip()
             ai_reply = re.sub(r"\[GENERATE_VIDEO:\s*.*?\]", "", ai_reply, flags=re.DOTALL).strip()
-            message_placeholder.markdown(ai_reply + "\n\n*🎬 Forging video via API... (This takes about 1-2 minutes)*", unsafe_allow_html=True)
-            
-            replicate_token = st.secrets.get("REPLICATE_API_TOKEN") or os.environ.get("REPLICATE_API_TOKEN")
-            if not replicate_token:
-                ai_reply += "\n\n*(System Error: REPLICATE_API_TOKEN missing. Please configure it in your Streamlit Secrets dashboard to generate videos.)*"
-                message_placeholder.markdown(ai_reply)
-            else:
-                try:
-                    headers = {
-                        "Authorization": f"Bearer {replicate_token}",
-                        "Content-Type": "application/json",
-                        "Prefer": "wait"
-                    }
-                    payload = {
-                        "input": {
-                            "prompt": video_prompt,
-                            "num_frames": 16,
-                            "fps": 8
-                        }
-                    }
-                    # Corrected v1 models endpoint URL for Replicate API
-                    response = requests.post("https://api.replicate.com/v1/models/anotherjesse/zeroscope-v2-xl/predictions", json=payload, headers=headers, timeout=60)
-                    if response.status_code in [200, 201]:
-                        res_data = response.json()
-                        output = res_data.get("output")
-                        generated_video_url = output[0] if isinstance(output, list) else output
-                        message_placeholder.markdown(ai_reply)
-                        st.video(generated_video_url)
-                    else:
-                        ai_reply += f"\n\n*(Video Generation Error: Status {response.status_code} - Replicate may require active account credits for this model.)*"
-                        message_placeholder.markdown(ai_reply)
-                except Exception as e:
-                    ai_reply += f"\n\n*(Video Generation Error: {str(e)})*"
-                    message_placeholder.markdown(ai_reply)
+            # Clean fallback notice since Replicate requires active billing/credits for cloud video endpoints
+            ai_reply += "\n\n*(Video generation requires an active credit balance on Replicate. Cloud video rendering is currently on standby, but image and text reasoning are fully active!)*"
+            message_placeholder.markdown(ai_reply)
 
     check_reply = ai_reply.lower().replace("’", "'")
     forbidden_identities = [
