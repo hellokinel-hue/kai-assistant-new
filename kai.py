@@ -325,26 +325,25 @@ st.markdown(
         position: fixed !important; top: 1.2rem !important; right: 1.5rem !important; z-index: 999999 !important;
     }
     
-    /* BULLETPROOF ATTACH (+) BUTTON POSITIONING */
+    /* PERFECTLY SNAPPED (+) ATTACH BUTTON INTO THE CHAT BAR */
     .st-key-attach_popover {
         position: fixed !important; 
-        bottom: 27px !important; 
-        left: 50% !important; 
-        margin-left: -375px !important;
+        bottom: 22px !important; 
+        left: calc(50% - 355px) !important; 
         z-index: 9999999 !important;
     }
     
-    @media (max-width: 780px) {
+    @media (max-width: 800px) {
         .st-key-attach_popover {
-            left: 20px !important;
-            margin-left: 0 !important;
+            left: 28px !important;
+            bottom: 22px !important;
         }
     }
 
     .st-key-attach_popover button {
         background: transparent !important; color: #8e9196 !important; border: none !important;
-        width: 40px !important; height: 40px !important; border-radius: 50% !important;
-        font-size: 1.4rem !important; padding: 0 !important; box-shadow: none !important;
+        width: 36px !important; height: 36px !important; border-radius: 50% !important;
+        font-size: 1.3rem !important; padding: 0 !important; box-shadow: none !important;
         display: flex !important; align-items: center !important; justify-content: center !important;
     }
     .st-key-attach_popover button:hover {
@@ -557,7 +556,6 @@ if prompt := st.chat_input("Ask KAI anything..."):
     api_content = prompt
     display_content = prompt
     
-    # Upgraded elite model tier selection (Groq open-weights frontier lineup)
     models_to_try = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"]
     
     if 'uploaded_file' in locals() and uploaded_file is not None:
@@ -719,7 +717,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
                     try:
                         bbox = draw.textbbox((0, 0), text, font=font)
                         tw = bbox[2] - bbox[0]
-                        th = bbox[3] - bbox[1]
+                        th = bbox[3] - bbox[0]
                     except AttributeError:
                         tw, th = draw.textsize(text, font=font)
                     
