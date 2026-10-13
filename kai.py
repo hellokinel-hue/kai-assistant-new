@@ -443,7 +443,8 @@ if prompt := st.chat_input("Ask KAI anything..."):
     api_content = prompt
     display_content = prompt
     
-    models_to_try = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+    # Updated active models list
+    models_to_try = ["llama-3.3-70b-versatile", "gpt-oss-120b", "llama3-70b-8192"]
     
     if 'uploaded_file' in locals() and uploaded_file is not None:
         file_ext = uploaded_file.name.lower().split('.')[-1]
