@@ -582,7 +582,6 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 if res and res.status_code == 200:
                     img = Image.open(io.BytesIO(res.content))
                     
-                    # Automatically crop off the bottom strip where any extra watermark appears
                     w, h = img.size
                     img = img.crop((0, 0, w, h - 38))
                     
@@ -613,7 +612,6 @@ if prompt := st.chat_input("Ask KAI anything..."):
                     except AttributeError:
                         tw, th = draw.textsize(text, font=font)
                     
-                    # Clean top-right corner placement for your KAI watermark
                     x, y = img.size[0] - tw - 20, 20
                     
                     for offset_x in [-2, -1, 0, 1, 2]:
@@ -661,13 +659,11 @@ if prompt := st.chat_input("Ask KAI anything..."):
                         "Prefer": "wait"
                     }
                     payload = {
-                        "version": "9f747673945c62801b13b84701c783929c0ee784e4748ec062204894dda1a351",
+                        "version": "c3937f37cc24a35cf57041738e4a2c07fb1fccfcbb273bbbc49539308e2f69e9",
                         "input": {
                             "prompt": video_prompt,
-                            "num_frames": 24,
-                            "fps": 8,
-                            "width": 1024,
-                            "height": 576
+                            "num_frames": 16,
+                            "fps": 8
                         }
                     }
                     response = requests.post("https://api.replicate.com/v1/predictions", json=payload, headers=headers, timeout=60)
@@ -678,7 +674,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
                         message_placeholder.markdown(ai_reply)
                         st.video(generated_video_url)
                     else:
-                        ai_reply += f"\n\n*(Video Generation Error: Status {response.status_code})*"
+                        ai_reply += f"\n\n*(Video Generation Error: Status {response.status_code} - Please check your Replicate account balance or billing settings.)*"
                         message_placeholder.markdown(ai_reply)
                 except Exception as e:
                     ai_reply += f"\n\n*(Video Generation Error: {str(e)})*"
