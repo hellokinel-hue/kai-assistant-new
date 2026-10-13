@@ -581,6 +581,11 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 
                 if res and res.status_code == 200:
                     img = Image.open(io.BytesIO(res.content))
+                    
+                    # Automatically crop off the bottom strip where any extra watermark appears
+                    w, h = img.size
+                    img = img.crop((0, 0, w, h - 38))
+                    
                     draw = ImageDraw.Draw(img)
                     
                     font_path = os.path.join(LOCAL_DB_DIR, "Roboto-Black.ttf")
@@ -608,7 +613,8 @@ if prompt := st.chat_input("Ask KAI anything..."):
                     except AttributeError:
                         tw, th = draw.textsize(text, font=font)
                     
-                    x, y = img.size[0] - tw - 20, img.size[1] - th - 20
+                    # Clean top-right corner placement for your KAI watermark
+                    x, y = img.size[0] - tw - 20, 20
                     
                     for offset_x in [-2, -1, 0, 1, 2]:
                         for offset_y in [-2, -1, 0, 1, 2]:
@@ -645,7 +651,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
             
             replicate_token = st.secrets.get("REPLICATE_API_TOKEN") or os.environ.get("REPLICATE_API_TOKEN")
             if not replicate_token:
-                ai_reply += "\n\n*(System Error: REPLICATE_API_TOKEN missing. Please configure it to generate videos.)*"
+                ai_reply += "\n\n*(System Error: REPLICATE_API_TOKEN missing. Please configure it in your Streamlit Secrets dashboard to generate videos.)*"
                 message_placeholder.markdown(ai_reply)
             else:
                 try:
@@ -665,7 +671,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
                         }
                     }
                     response = requests.post("https://api.replicate.com/v1/predictions", json=payload, headers=headers, timeout=60)
-                    if response.status_code == 201 or response.status_code == 200:
+                    if response.status_code in [200, 201]:
                         res_data = response.json()
                         output = res_data.get("output")
                         generated_video_url = output[0] if isinstance(output, list) else output
