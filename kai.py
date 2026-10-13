@@ -261,7 +261,7 @@ st.markdown(
         display: none !important; visibility: hidden !important;
     }
     [data-testid="stHeader"] { background-color: transparent !important; box-shadow: none !important; }
-    .block-container { padding-top: 2rem !important; padding-bottom: 7rem !important; max-width: 760px !important; }
+    .block-container { padding-top: 2rem !important; padding-bottom: 6rem !important; max-width: 760px !important; }
     
     button[data-testid="stBaseButton-primary"] {
         background: linear-gradient(135deg, #4285f4 0%, #9b72cb 50%, #d96570 100%) !important;
@@ -512,41 +512,13 @@ for idx, message in enumerate(st.session_state.messages):
             st.markdown(message["content"], unsafe_allow_html=True) 
 
 # -----------------------------------------------------------------------------
-# 8. NATIVE ATTACHMENT TOOLBAR (STABLE & RIGHT ABOVE INPUT)
-# -----------------------------------------------------------------------------
-with st.container():
-    uploaded_file = st.file_uploader(
-        "📎 Attach image or file to your message", 
-        type=["png", "jpg", "jpeg", "txt", "md", "csv", "py"],
-        label_visibility="visible"
-    )
-
-# -----------------------------------------------------------------------------
-# 9. CHAT INPUT HANDLER & HIGH-PERFORMANCE MODEL FALLBACK
+# 8. CHAT INPUT HANDLER & HIGH-PERFORMANCE MODEL FALLBACK
 # -----------------------------------------------------------------------------
 if prompt := st.chat_input("Ask KAI anything..."):
     api_content = prompt
     display_content = prompt
     
     models_to_try = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"]
-    
-    if 'uploaded_file' in locals() and uploaded_file is not None:
-        file_ext = uploaded_file.name.lower().split('.')[-1]
-        if file_ext in ['png', 'jpg', 'jpeg']:
-            base64_image = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
-            mime_type = f"image/{'png' if file_ext == 'png' else 'jpeg'}"
-            api_content = [
-                {"type": "text", "text": prompt},
-                {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}}
-            ]
-            display_content = f"*[Attached Image: {uploaded_file.name}]*\n\n{prompt}"
-        else:
-            try:
-                file_text = uploaded_file.getvalue().decode('utf-8')
-                api_content = f"Here is the content of the attached file '{uploaded_file.name}':\n\n{file_text}\n\nUser Question: {prompt}"
-                display_content = f"*[Attached File: {uploaded_file.name}]*\n\n{prompt}"
-            except Exception as e:
-                display_content = f"*[Error reading file: {uploaded_file.name}]*\n\n{prompt}"
 
     if not st.session_state.messages and st.session_state.logged_in_user:
         title = prompt[:25] + "..." if len(prompt) > 25 else prompt
