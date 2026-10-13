@@ -11,6 +11,9 @@ import base64
 import io
 import random
 import requests
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from PIL import Image, ImageDraw, ImageFont
 from groq import Groq  
 
@@ -28,7 +31,7 @@ def init_db():
     with get_db_connection() as conn:
         c = conn.cursor()
         c.execute('''CREATE TABLE IF NOT EXISTS users 
-                     (email TEXT PRIMARY KEY, password_hash TEXT, salt TEXT)''')
+                     (email TEXT PRIMARY KEY, password_hash TEXT, salt TEXT, verified INTEGER DEFAULT 1, reset_code TEXT)''')
         
         c.execute('''CREATE TABLE IF NOT EXISTS chats
                      (session_id TEXT PRIMARY KEY, email TEXT, title TEXT, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)''')
@@ -38,8 +41,13 @@ def init_db():
                      email TEXT, role TEXT, content TEXT, session_id TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''')
         
         c.execute("PRAGMA table_info(users)")
-        if 'salt' not in [info[1] for info in c.fetchall()]:
+        user_cols = [info[1] for info in c.fetchall()]
+        if 'salt' not in user_cols:
             c.execute("ALTER TABLE users ADD COLUMN salt TEXT")
+        if 'verified' not in user_cols:
+            c.execute("ALTER TABLE users ADD COLUMN verified INTEGER DEFAULT 1")
+        if 'reset_code' not in user_cols:
+            c.execute("ALTER TABLE users ADD COLUMN reset_code TEXT")
             
         c.execute("PRAGMA table_info(messages)")
         if 'session_id' not in [info[1] for info in c.fetchall()]:
@@ -59,6 +67,85 @@ def hash_password(password, salt=None):
 def is_valid_email(email):
     return re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", email) is not None
 
+# -----------------------------------------------------------------------------
+# 1.5 PROFESSIONAL AUTOMATED EMAIL SYSTEM (BREVO SMTP)
+# -----------------------------------------------------------------------------
+def send_kai_email(to_email, subject, html_body):
+    smtp_server = "smtp-relay.brevo.com"
+    smtp_port = 587
+    sender_email = st.secrets.get("BREVO_SENDER_EMAIL") or os.environ.get("BREVO_SENDER_EMAIL")
+    smtp_password = st.secrets.get("BREVO_SMTP_KEY") or os.environ.get("BREVO_SMTP_KEY")
+    
+    if not sender_email or not smtp_password:
+        return False, "SMTP credentials not configured."
+    
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"KAI Assistant <{sender_email}>"
+        msg["To"] = to_email
+        msg.attach(MIMEText(html_body, "html"))
+        
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(sender_email, smtp_password)
+            server.sendmail(sender_email, to_email, msg.as_string())
+        return True, "Success"
+    except Exception as e:
+        return False, str(e)
+
+def send_welcome_email(to_email):
+    subject = "Welcome to KAI — Your Digital Assistant"
+    html_body = f"""
+    <div style="background-color: #131314; color: #e3e3e3; padding: 30px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border-radius: 12px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <h1 style="background: linear-gradient(74deg, #4285f4 0%, #9b72cb 35%, #d96570 70%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 2.5rem; margin: 0;">KAI</h1>
+            <p style="color: #8e9196; font-size: 1rem;">Exclusive Digital Assistant</p>
+        </div>
+        <div style="background-color: #1e1f20; padding: 25px; border-radius: 12px; border: 1px solid #333537;">
+            <h2 style="color: #ffffff; margin-top: 0;">Welcome aboard!</h2>
+            <p>Hello <code>{to_email}</code>,</p>
+            <p>Your account has been successfully created. You now have full access to high-speed text reasoning, custom watermarked image generation, and secure cloud memory.</p>
+            <p style="margin-top: 25px; color: #8e9196; font-size: 0.9rem;">Developed by Kinel de Silva.</p>
+        </div>
+    </div>
+    """
+    return send_kai_email(to_email, subject, html_body)
+
+def send_login_notification_email(to_email):
+    subject = "Security Alert: New Login to KAI"
+    html_body = f"""
+    <div style="background-color: #131314; color: #e3e3e3; padding: 30px; font-family: 'Segoe UI', sans-serif; border-radius: 12px;">
+        <div style="background-color: #1e1f20; padding: 25px; border-radius: 12px; border: 1px solid #333537;">
+            <h2 style="color: #4285f4; margin-top: 0;">Successful Login Notification</h2>
+            <p>Hello <code>{to_email}</code>,</p>
+            <p>We detected a successful login to your KAI account.</p>
+            <p style="color: #8e9196; font-size: 0.85rem; margin-top: 20px;">If this was you, no action is needed.</p>
+        </div>
+    </div>
+    """
+    return send_kai_email(to_email, subject, html_body)
+
+def send_password_reset_email(to_email, reset_code):
+    subject = "KAI Password Reset Request"
+    html_body = f"""
+    <div style="background-color: #131314; color: #e3e3e3; padding: 30px; font-family: 'Segoe UI', sans-serif; border-radius: 12px;">
+        <div style="background-color: #1e1f20; padding: 25px; border-radius: 12px; border: 1px solid #333537;">
+            <h2 style="color: #d96570; margin-top: 0;">Password Reset Code</h2>
+            <p>You requested a password reset for your KAI account (<code>{to_email}</code>).</p>
+            <p>Your secure verification code is:</p>
+            <div style="background-color: #282a2c; padding: 15px; text-align: center; font-size: 1.8rem; font-weight: bold; letter-spacing: 3px; color: #a8c7fa; border-radius: 8px; margin: 20px 0;">
+                {reset_code}
+            </div>
+            <p style="color: #8e9196; font-size: 0.85rem;">If you did not request this, please ignore this email.</p>
+        </div>
+    </div>
+    """
+    return send_kai_email(to_email, subject, html_body)
+
+# -----------------------------------------------------------------------------
+# 2. USER AUTHENTICATION HELPERS
+# -----------------------------------------------------------------------------
 def create_user(email, password):
     email = email.strip().lower()
     if not is_valid_email(email): return "invalid_email"
@@ -67,8 +154,9 @@ def create_user(email, password):
     try:
         with get_db_connection() as conn:
             c = conn.cursor()
-            c.execute("INSERT INTO users (email, password_hash, salt) VALUES (?, ?, ?)", (email, pwd_hash, salt))
+            c.execute("INSERT INTO users (email, password_hash, salt, verified) VALUES (?, ?, ?, 1)", (email, pwd_hash, salt))
             conn.commit()
+        send_welcome_email(email)
         return "success"
     except sqlite3.IntegrityError:
         return "exists"
@@ -83,19 +171,33 @@ def verify_user(email, password):
         stored_hash, salt = result[0], result[1]
         if salt is None: return False 
         computed_hash, _ = hash_password(password, salt)
-        if stored_hash == computed_hash: return True
+        if stored_hash == computed_hash:
+            return True
     return False
 
-def reset_user_password(email, new_password):
+def request_password_reset(email):
     email = email.strip().lower()
     if not is_valid_email(email): return "invalid_email"
-    if len(new_password) < 6: return "weak_password"
     with get_db_connection() as conn:
         c = conn.cursor()
         c.execute("SELECT email FROM users WHERE email = ?", (email,))
         if not c.fetchone(): return "not_found"
+        code = str(random.randint(100000, 999999))
+        c.execute("UPDATE users SET reset_code = ? WHERE email = ?", (code, email))
+        conn.commit()
+    send_password_reset_email(email, code)
+    return "success"
+
+def reset_user_password_with_code(email, code, new_password):
+    email = email.strip().lower()
+    if len(new_password) < 6: return "weak_password"
+    with get_db_connection() as conn:
+        c = conn.cursor()
+        c.execute("SELECT reset_code FROM users WHERE email = ?", (email,))
+        row = c.fetchone()
+        if not row or row[0] != code: return "invalid_code"
         pwd_hash, salt = hash_password(new_password)
-        c.execute("UPDATE users SET password_hash = ?, salt = ? WHERE email = ?", (pwd_hash, salt, email))
+        c.execute("UPDATE users SET password_hash = ?, salt = ?, reset_code = NULL WHERE email = ?", (pwd_hash, salt, email))
         conn.commit()
     return "success"
 
@@ -139,7 +241,7 @@ def save_message(email, role, content, session_id):
         update_chat_timestamp(session_id)
 
 # -----------------------------------------------------------------------------
-# 2. PAGE CONFIG & AGGRESSIVE CSS OVERRIDES
+# 3. PAGE CONFIG & AGGRESSIVE CSS OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="KAI", page_icon="K", layout="centered", initial_sidebar_state="expanded")
 
@@ -254,14 +356,14 @@ st.markdown(
 )
 
 # -----------------------------------------------------------------------------
-# 3. SESSION STATE INITIALIZATION
+# 4. SESSION STATE INITIALIZATION
 # -----------------------------------------------------------------------------
 if "logged_in_user" not in st.session_state: st.session_state.logged_in_user = None
 if "messages" not in st.session_state: st.session_state.messages = []
 if "current_session_id" not in st.session_state: st.session_state.current_session_id = str(uuid.uuid4())
 
 # -----------------------------------------------------------------------------
-# 4. TOP-RIGHT AUTHENTICATION / PROFILE
+# 5. TOP-RIGHT AUTHENTICATION / PROFILE
 # -----------------------------------------------------------------------------
 if st.session_state.logged_in_user:
     safe_email = urllib.parse.quote(st.session_state.logged_in_user)
@@ -302,7 +404,12 @@ else:
                 login_pass = st.text_input("Password", type="password", key="login_pass")
                 if st.button("Log In", use_container_width=True, type="primary"):
                     if verify_user(login_email, login_pass):
-                        st.session_state.logged_in_user = login_email.strip().lower()
+                        user_email_clean = login_email.strip().lower()
+                        if st.session_state.get(f"login_notified_{user_email_clean}") != True:
+                            send_login_notification_email(user_email_clean)
+                            st.session_state[f"login_notified_{user_email_clean}"] = True
+                        
+                        st.session_state.logged_in_user = user_email_clean
                         user_chats = get_user_chats(st.session_state.logged_in_user)
                         if user_chats:
                             st.session_state.current_session_id = user_chats[0]['session_id']
@@ -319,21 +426,28 @@ else:
                 signup_pass = st.text_input("Password (≥ 6 chars)", type="password", key="signup_pass")
                 if st.button("Create Account", use_container_width=True):
                     result = create_user(signup_email, signup_pass)
-                    if result == "success": st.success("Account created! Switch to 'Log In' tab.")
+                    if result == "success": st.success("Account created & welcome email sent! Switch to 'Log In'.")
                     elif result == "exists": st.error("Email already registered.")
                     else: st.error("Check email format and password length.")
 
             with tab3:
                 reset_email = st.text_input("Registered Email", key="reset_email", placeholder="name@example.com")
-                reset_pass = st.text_input("New Password", type="password", key="reset_pass")
-                if st.button("Reset Password", use_container_width=True):
-                    result = reset_user_password(reset_email, reset_pass)
-                    if result == "success": st.success("Password reset! Switch to 'Log In' tab.")
-                    elif result == "not_found": st.error("Email not found.")
-                    else: st.error("Check email format and password length.")
+                if st.button("Send Reset Code", use_container_width=True):
+                    res = request_password_reset(reset_email)
+                    if res == "success": st.success("Reset code sent to your email!")
+                    elif res == "not_found": st.error("Email not found.")
+                    else: st.error("Invalid email format.")
+                
+                reset_code_input = st.text_input("6-Digit Code", key="reset_code_input")
+                new_pass_input = st.text_input("New Password", type="password", key="new_pass_input")
+                if st.button("Confirm Reset Password", use_container_width=True, type="primary"):
+                    res = reset_user_password_with_code(reset_email, reset_code_input, new_pass_input)
+                    if res == "success": st.success("Password successfully updated! Switch to 'Log In'.")
+                    elif res == "invalid_code": st.error("Invalid verification code.")
+                    else: st.error("Password must be at least 6 characters.")
 
 # -----------------------------------------------------------------------------
-# 5. SIDEBAR: CHAT HISTORY ONLY
+# 6. SIDEBAR: CHAT HISTORY ONLY
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("### 💬 Chat History")
@@ -362,7 +476,7 @@ with st.sidebar:
         st.info("Please log in to save and view your chat history.")
 
 # -----------------------------------------------------------------------------
-# 6. MAIN CHAT UI & GREETING
+# 7. MAIN CHAT UI & GREETING
 # -----------------------------------------------------------------------------
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -424,7 +538,7 @@ for idx, message in enumerate(st.session_state.messages):
             st.markdown(message["content"], unsafe_allow_html=True) 
 
 # -----------------------------------------------------------------------------
-# 7. ATTACH BUTTON INJECTION
+# 8. ATTACH BUTTON INJECTION
 # -----------------------------------------------------------------------------
 with st.container():
     with st.popover("➕", key="attach_popover"):
@@ -437,13 +551,14 @@ with st.container():
             st.success(f"Attached: {uploaded_file.name}")
 
 # -----------------------------------------------------------------------------
-# 8. CHAT INPUT HANDLER & SELF-HEALING MODEL FALLBACK
+# 9. CHAT INPUT HANDLER & HIGH-PERFORMANCE MODEL FALLBACK
 # -----------------------------------------------------------------------------
 if prompt := st.chat_input("Ask KAI anything..."):
     api_content = prompt
     display_content = prompt
     
-    models_to_try = ["openai/gpt-oss-120b", "llama-3.1-8b-instant"]
+    # Upgraded elite model tier selection (Groq open-weights frontier lineup)
+    models_to_try = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"]
     
     if 'uploaded_file' in locals() and uploaded_file is not None:
         file_ext = uploaded_file.name.lower().split('.')[-1]
@@ -455,7 +570,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}}
             ]
             display_content = f"*[Attached Image: {uploaded_file.name}]*\n\n{prompt}"
-            models_to_try = ["llama-3.2-11b-vision-preview", "qwen/qwen3.8-27b"]
+            models_to_try = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"]
         else:
             try:
                 file_text = uploaded_file.getvalue().decode('utf-8')
@@ -514,9 +629,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 "You are simply KAI. If asked who made you, say 'Kinel de Silva'.\n\n"
                 "IMAGE GENERATION: You have the ability to generate images infinitely. If the user asks you to create, generate, draw, or show a picture/image, "
                 "you MUST include the following tag anywhere in your response: [GENERATE_IMAGE: <detailed visual description of the image>] .\n\n"
-                "VIDEO GENERATION: If the user asks you to generate, create, or make a video, "
-                "you MUST include the following tag anywhere in your response: [GENERATE_VIDEO: <detailed prompt for video motion and visuals>] .\n\n"
-                "CRITICAL INSTRUCTION: NEVER output standard markdown image links. ONLY use the [GENERATE_IMAGE:] or [GENERATE_VIDEO:] tags."
+                "CRITICAL INSTRUCTION: NEVER output standard markdown image links. ONLY use the [GENERATE_IMAGE:] tag."
             )
             
             full_messages = [{"role": "system", "content": ultra_strict_system_prompt}]
@@ -581,12 +694,10 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 
                 if res and res.status_code == 200:
                     img = Image.open(io.BytesIO(res.content))
-                    
                     w, h = img.size
                     img = img.crop((0, 0, w, h - 38))
                     
                     draw = ImageDraw.Draw(img)
-                    
                     font_path = os.path.join(LOCAL_DB_DIR, "Roboto-Black.ttf")
                     if not os.path.exists(font_path):
                         try:
@@ -613,7 +724,6 @@ if prompt := st.chat_input("Ask KAI anything..."):
                         tw, th = draw.textsize(text, font=font)
                     
                     x, y = img.size[0] - tw - 20, 20
-                    
                     for offset_x in [-2, -1, 0, 1, 2]:
                         for offset_y in [-2, -1, 0, 1, 2]:
                             draw.text((x+offset_x, y+offset_y), text, font=font, fill="black")
@@ -639,16 +749,6 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 ai_reply += "\n\n*(Image Generation Error: The image service is temporarily unavailable.)*"
                 message_placeholder.markdown(ai_reply)
 
-    generated_video_url = None
-    if "[GENERATE_VIDEO:" in ai_reply:
-        match = re.search(r"\[GENERATE_VIDEO:\s*(.*?)\]", ai_reply, re.DOTALL)
-        if match:
-            video_prompt = match.group(1).strip()
-            ai_reply = re.sub(r"\[GENERATE_VIDEO:\s*.*?\]", "", ai_reply, flags=re.DOTALL).strip()
-            # Clean fallback notice since Replicate requires active billing/credits for cloud video endpoints
-            ai_reply += "\n\n*(Video generation requires an active credit balance on Replicate. Cloud video rendering is currently on standby, but image and text reasoning are fully active!)*"
-            message_placeholder.markdown(ai_reply)
-
     check_reply = ai_reply.lower().replace("’", "'")
     forbidden_identities = [
         "an ai language model", "a language model", "created by openai",
@@ -663,8 +763,6 @@ if prompt := st.chat_input("Ask KAI anything..."):
     msg_data = {"role": "assistant", "content": ai_reply}
     if generated_img_obj:
         msg_data["image_obj"] = generated_img_obj
-    if generated_video_url:
-        msg_data["content"] += f"\n\n*(Video URL: {generated_video_url})*"
         
     st.session_state.messages.append(msg_data)
     save_message(st.session_state.logged_in_user, "assistant", msg_data["content"], st.session_state.current_session_id)
