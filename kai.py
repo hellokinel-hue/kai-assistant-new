@@ -241,7 +241,7 @@ def save_message(email, role, content, session_id):
         update_chat_timestamp(session_id)
 
 # -----------------------------------------------------------------------------
-# 3. PAGE CONFIG & AGGRESSIVE CSS OVERRIDES
+# 3. PAGE CONFIG & CLEAN STYLING
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="KAI", page_icon="K", layout="centered", initial_sidebar_state="expanded")
 
@@ -289,7 +289,7 @@ st.markdown(
     /* CHAT INPUT STYLING */
     [data-testid="stChatInput"] {
         background-color: #1e1f20 !important; border: 1px solid #333537 !important;
-        border-radius: 32px !important; padding: 0.2rem 0.8rem 0.2rem 3.5rem !important; 
+        border-radius: 32px !important; padding: 0.2rem 0.8rem !important; 
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
     }
     [data-testid="stChatInput"] * {
@@ -323,31 +323,6 @@ st.markdown(
     /* TOP-RIGHT PROFILE / SIGN IN */
     .st-key-profile_popover, .st-key-login_popover {
         position: fixed !important; top: 1.2rem !important; right: 1.5rem !important; z-index: 999999 !important;
-    }
-    
-    /* PERFECTLY SNAPPED (+) ATTACH BUTTON INTO THE CHAT BAR */
-    .st-key-attach_popover {
-        position: fixed !important; 
-        bottom: 22px !important; 
-        left: calc(50% - 355px) !important; 
-        z-index: 9999999 !important;
-    }
-    
-    @media (max-width: 800px) {
-        .st-key-attach_popover {
-            left: 28px !important;
-            bottom: 22px !important;
-        }
-    }
-
-    .st-key-attach_popover button {
-        background: transparent !important; color: #8e9196 !important; border: none !important;
-        width: 36px !important; height: 36px !important; border-radius: 50% !important;
-        font-size: 1.3rem !important; padding: 0 !important; box-shadow: none !important;
-        display: flex !important; align-items: center !important; justify-content: center !important;
-    }
-    .st-key-attach_popover button:hover {
-        background-color: #333537 !important; color: #e3e3e3 !important; border-color: transparent !important;
     }
     </style>
     """,
@@ -537,12 +512,13 @@ for idx, message in enumerate(st.session_state.messages):
             st.markdown(message["content"], unsafe_allow_html=True) 
 
 # -----------------------------------------------------------------------------
-# 8. ATTACH BUTTON INJECTION
+# 8. CLEAN ATTACHMENT BUTTON TOOLBAR
 # -----------------------------------------------------------------------------
-with st.container():
-    with st.popover("➕", key="attach_popover"):
+col_attach, col_empty = st.columns([0.1, 0.9])
+with col_attach:
+    with st.popover("➕"):
         uploaded_file = st.file_uploader(
-            "Upload context before sending your message", 
+            "Upload file or image", 
             type=["png", "jpg", "jpeg", "txt", "md", "csv", "py"],
             label_visibility="collapsed"
         )
@@ -568,7 +544,6 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}}
             ]
             display_content = f"*[Attached Image: {uploaded_file.name}]*\n\n{prompt}"
-            models_to_try = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"]
         else:
             try:
                 file_text = uploaded_file.getvalue().decode('utf-8')
@@ -717,7 +692,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
                     try:
                         bbox = draw.textbbox((0, 0), text, font=font)
                         tw = bbox[2] - bbox[0]
-                        th = bbox[3] - bbox[0]
+                        th = bbox[3] - bbox[1]
                     except AttributeError:
                         tw, th = draw.textsize(text, font=font)
                     
