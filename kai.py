@@ -289,7 +289,7 @@ st.markdown(
     /* CHAT INPUT STYLING */
     [data-testid="stChatInput"] {
         background-color: #1e1f20 !important; border: 1px solid #333537 !important;
-        border-radius: 32px !important; padding: 0.2rem 0.8rem !important; 
+        border-radius: 32px !important; padding: 0.2rem 1rem !important; 
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
     }
     [data-testid="stChatInput"] * {
@@ -421,7 +421,7 @@ else:
                     else: st.error("Password must be at least 6 characters.")
 
 # -----------------------------------------------------------------------------
-# 6. SIDEBAR: CHAT HISTORY ONLY
+# 6. SIDEBAR: CHAT HISTORY & ATTACHMENTS
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("### 💬 Chat History")
@@ -448,6 +448,16 @@ with st.sidebar:
             st.caption("No chat history saved yet.")
     else:
         st.info("Please log in to save and view your chat history.")
+        
+    st.markdown("---")
+    st.markdown("### 📎 Attach Context")
+    uploaded_file = st.file_uploader(
+        "Upload image or file", 
+        type=["png", "jpg", "jpeg", "txt", "md", "csv", "py"],
+        label_visibility="collapsed"
+    )
+    if uploaded_file:
+        st.success(f"Attached: {uploaded_file.name}")
 
 # -----------------------------------------------------------------------------
 # 7. MAIN CHAT UI & GREETING
@@ -512,21 +522,7 @@ for idx, message in enumerate(st.session_state.messages):
             st.markdown(message["content"], unsafe_allow_html=True) 
 
 # -----------------------------------------------------------------------------
-# 8. CLEAN ATTACHMENT BUTTON TOOLBAR
-# -----------------------------------------------------------------------------
-col_attach, col_empty = st.columns([0.1, 0.9])
-with col_attach:
-    with st.popover("➕"):
-        uploaded_file = st.file_uploader(
-            "Upload file or image", 
-            type=["png", "jpg", "jpeg", "txt", "md", "csv", "py"],
-            label_visibility="collapsed"
-        )
-        if uploaded_file:
-            st.success(f"Attached: {uploaded_file.name}")
-
-# -----------------------------------------------------------------------------
-# 9. CHAT INPUT HANDLER & HIGH-PERFORMANCE MODEL FALLBACK
+# 8. CHAT INPUT HANDLER & HIGH-PERFORMANCE MODEL FALLBACK
 # -----------------------------------------------------------------------------
 if prompt := st.chat_input("Ask KAI anything..."):
     api_content = prompt
