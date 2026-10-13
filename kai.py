@@ -443,8 +443,8 @@ if prompt := st.chat_input("Ask KAI anything..."):
     api_content = prompt
     display_content = prompt
     
-    # Strictly valid, currently live Groq endpoints
-    models_to_try = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
+    # Active production model endpoints on Groq
+    models_to_try = ["openai/gpt-oss-120b", "llama-3.1-8b-instant"]
     
     if 'uploaded_file' in locals() and uploaded_file is not None:
         file_ext = uploaded_file.name.lower().split('.')[-1]
@@ -456,7 +456,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}}
             ]
             display_content = f"*[Attached Image: {uploaded_file.name}]*\n\n{prompt}"
-            models_to_try = ["llama-3.2-11b-vision-preview", "qwen/qwen3.6-27b"]
+            models_to_try = ["llama-3.2-11b-vision-preview", "qwen/qwen3.8-27b"]
         else:
             try:
                 file_text = uploaded_file.getvalue().decode('utf-8')
