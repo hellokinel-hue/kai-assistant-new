@@ -659,14 +659,14 @@ if prompt := st.chat_input("Ask KAI anything..."):
                         "Prefer": "wait"
                     }
                     payload = {
-                        "version": "c3937f37cc24a35cf57041738e4a2c07fb1fccfcbb273bbbc49539308e2f69e9",
                         "input": {
                             "prompt": video_prompt,
                             "num_frames": 16,
                             "fps": 8
                         }
                     }
-                    response = requests.post("https://api.replicate.com/v1/predictions", json=payload, headers=headers, timeout=60)
+                    # Using the standard model endpoint instead of a locked version hash to prevent 422 errors
+                    response = requests.post("https://api.replicate.com/v1/models/anotherjesse/zeroscope-v2-xl/predictions", json=payload, headers=headers, timeout=60)
                     if response.status_code in [200, 201]:
                         res_data = response.json()
                         output = res_data.get("output")
@@ -674,7 +674,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
                         message_placeholder.markdown(ai_reply)
                         st.video(generated_video_url)
                     else:
-                        ai_reply += f"\n\n*(Video Generation Error: Status {response.status_code} - Please check your Replicate account balance or billing settings.)*"
+                        ai_reply += f"\n\n*(Video Generation Error: Status {response.status_code} - Please check your Replicate account setup.)*"
                         message_placeholder.markdown(ai_reply)
                 except Exception as e:
                     ai_reply += f"\n\n*(Video Generation Error: {str(e)})*"
