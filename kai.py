@@ -443,7 +443,6 @@ if prompt := st.chat_input("Ask KAI anything..."):
     api_content = prompt
     display_content = prompt
     
-    # Active production model endpoints on Groq
     models_to_try = ["openai/gpt-oss-120b", "llama-3.1-8b-instant"]
     
     if 'uploaded_file' in locals() and uploaded_file is not None:
@@ -638,12 +637,11 @@ if prompt := st.chat_input("Ask KAI anything..."):
 
     generated_video_url = None
     if "[GENERATE_VIDEO:" in ai_reply:
-        import replicate
         match = re.search(r"\[GENERATE_VIDEO:\s*(.*?)\]", ai_reply, re.DOTALL)
         if match:
             video_prompt = match.group(1).strip()
             ai_reply = re.sub(r"\[GENERATE_VIDEO:\s*.*?\]", "", ai_reply, flags=re.DOTALL).strip()
-            message_placeholder.markdown(ai_reply + "\n\n*🎬 Forging video... (This takes about 1-2 minutes)*", unsafe_allow_html=True)
+            message_placeholder.markdown(ai_reply + "\n\n*🎬 Forging video via API... (This takes about 1-2 minutes)*", unsafe_allow_html=True)
             
             replicate_token = st.secrets.get("REPLICATE_API_TOKEN") or os.environ.get("REPLICATE_API_TOKEN")
             if not replicate_token:
@@ -651,20 +649,31 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 message_placeholder.markdown(ai_reply)
             else:
                 try:
-                    os.environ["REPLICATE_API_TOKEN"] = replicate_token
-                    output = replicate.run(
-                        "anotherjesse/zeroscope-v2-xl:9f747673945c62801b13b84701c783929c0ee784e4748ec062204894dda1a351",
-                        input={
+                    headers = {
+                        "Authorization": f"Bearer {replicate_token}",
+                        "Content-Type": "application/json",
+                        "Prefer": "wait"
+                    }
+                    payload = {
+                        "version": "9f747673945c62801b13b84701c783929c0ee784e4748ec062204894dda1a351",
+                        "input": {
                             "prompt": video_prompt,
                             "num_frames": 24,
                             "fps": 8,
                             "width": 1024,
                             "height": 576
                         }
-                    )
-                    generated_video_url = output[0] if isinstance(output, list) else output
-                    message_placeholder.markdown(ai_reply)
-                    st.video(generated_video_url)
+                    }
+                    response = requests.post("https://api.replicate.com/v1/predictions", json=payload, headers=headers, timeout=60)
+                    if response.status_code == 201 or response.status_code == 200:
+                        res_data = response.json()
+                        output = res_data.get("output")
+                        generated_video_url = output[0] if isinstance(output, list) else output
+                        message_placeholder.markdown(ai_reply)
+                        st.video(generated_video_url)
+                    else:
+                        ai_reply += f"\n\n*(Video Generation Error: Status {response.status_code})*"
+                        message_placeholder.markdown(ai_reply)
                 except Exception as e:
                     ai_reply += f"\n\n*(Video Generation Error: {str(e)})*"
                     message_placeholder.markdown(ai_reply)
