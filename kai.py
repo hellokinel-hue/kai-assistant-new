@@ -189,7 +189,6 @@ st.markdown(
         background-color: #1e1f20 !important; border: 1px solid #333537 !important;
         border-radius: 32px !important; padding: 0.2rem 0.8rem 0.2rem 3.5rem !important; 
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
-        display: flex !important; align-items: center !important;
     }
     [data-testid="stChatInput"] * {
         background-color: transparent !important; color: #e3e3e3 !important;
@@ -248,12 +247,6 @@ st.markdown(
     }
     .st-key-attach_popover button:hover {
         background-color: #333537 !important; color: #e3e3e3 !important; border-color: transparent !important;
-    }
-    
-    @keyframes pulse-red {
-        0% { transform: scale(1); filter: drop-shadow(0 0 2px red); }
-        50% { transform: scale(1.15); filter: drop-shadow(0 0 8px red); }
-        100% { transform: scale(1); filter: drop-shadow(0 0 2px red); }
     }
     </style>
     """,
@@ -444,122 +437,13 @@ with st.container():
             st.success(f"Attached: {uploaded_file.name}")
 
 # -----------------------------------------------------------------------------
-# 8. JAVASCRIPT TALK / MIC BUTTON INJECTION
-# -----------------------------------------------------------------------------
-components.html(
-    """
-    <script>
-    (function() {
-        function attachTalkButton() {
-            const doc = window.parent.document;
-            const container = doc.querySelector('[data-testid="stChatInput"]');
-            const submitBtn = doc.querySelector('[data-testid="stChatInputSubmitButton"]');
-            const textArea = doc.querySelector('[data-testid="stChatInputTextArea"]');
-            
-            if (!container || !submitBtn || doc.getElementById('kai-talk-btn')) return;
-
-            const talkBtn = doc.createElement('button');
-            talkBtn.id = 'kai-talk-btn';
-            talkBtn.innerHTML = '🎙️';
-            talkBtn.title = 'Speak to KAI';
-            talkBtn.type = 'button';
-            talkBtn.style.cssText = `
-                background: transparent;
-                border: none;
-                cursor: pointer;
-                font-size: 1.25rem;
-                padding: 6px;
-                margin-right: 6px;
-                border-radius: 50%;
-                transition: all 0.2s ease;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: #e3e3e3;
-            `;
-
-            talkBtn.onmouseover = () => { talkBtn.style.backgroundColor = '#333537'; };
-            talkBtn.onmouseout = () => { talkBtn.style.backgroundColor = 'transparent'; };
-
-            submitBtn.parentNode.insertBefore(talkBtn, submitBtn);
-
-            let recognizing = false;
-            const SpeechRecognition = window.parent.SpeechRecognition || window.parent.webkitSpeechRecognition;
-
-            if (!SpeechRecognition) {
-                talkBtn.title = "Speech recognition is not supported in this browser.";
-                talkBtn.style.opacity = "0.4";
-                return;
-            }
-
-            const recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.interimResults = true;
-            recognition.lang = 'en-US';
-
-            talkBtn.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (recognizing) {
-                    recognition.stop();
-                    return;
-                }
-                recognition.start();
-            };
-
-            recognition.onstart = () => {
-                recognizing = true;
-                talkBtn.innerHTML = '🔴';
-                talkBtn.style.animation = 'pulse-red 1s infinite';
-            };
-
-            recognition.onresult = (event) => {
-                let transcript = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    transcript += event.results[i][0].transcript;
-                }
-                if (textArea) {
-                    textArea.value = transcript;
-                    textArea.dispatchEvent(new Event('input', { bubbles: true }));
-                }
-            };
-
-            recognition.onend = () => {
-                recognizing = false;
-                talkBtn.innerHTML = '🎙️';
-                talkBtn.style.animation = 'none';
-                
-                if (textArea && textArea.value.trim() !== '') {
-                    setTimeout(() => {
-                        if (submitBtn) submitBtn.click();
-                    }, 400);
-                }
-            };
-
-            recognition.onerror = () => {
-                recognizing = false;
-                talkBtn.innerHTML = '🎙️';
-                talkBtn.style.animation = 'none';
-            };
-        }
-
-        setInterval(attachTalkButton, 800);
-    })();
-    </script>
-    """,
-    height=0,
-    width=0
-)
-
-# -----------------------------------------------------------------------------
-# 9. CHAT INPUT HANDLER & SELF-HEALING MODEL FALLBACK
+# 8. CHAT INPUT HANDLER & SELF-HEALING MODEL FALLBACK
 # -----------------------------------------------------------------------------
 if prompt := st.chat_input("Ask KAI anything..."):
     api_content = prompt
     display_content = prompt
     
-    # Primary & backup models list for self-healing
-    models_to_try = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"]
+    models_to_try = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
     
     if 'uploaded_file' in locals() and uploaded_file is not None:
         file_ext = uploaded_file.name.lower().split('.')[-1]
@@ -645,7 +529,6 @@ if prompt := st.chat_input("Ask KAI anything..."):
             
             client = Groq(api_key=st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY"))
             
-            # SELF-HEALING FALLBACK LOOP
             chat_completion = None
             last_error = None
             for model_candidate in models_to_try:
@@ -657,10 +540,10 @@ if prompt := st.chat_input("Ask KAI anything..."):
                         max_tokens=1024,
                         stream=True
                     )
-                    break # Successfully connected, exit loop!
+                    break 
                 except Exception as model_err:
                     last_error = model_err
-                    continue # Try next fallback model automatically
+                    continue 
             
             if chat_completion is None:
                 raise last_error
@@ -804,20 +687,3 @@ if prompt := st.chat_input("Ask KAI anything..."):
         
     st.session_state.messages.append(msg_data)
     save_message(st.session_state.logged_in_user, "assistant", msg_data["content"], st.session_state.current_session_id)
-    
-    clean_speech_text = re.sub(r'[*_`#]', '', ai_reply).replace("'", "\\'")
-    components.html(
-        f"""
-        <script>
-        if ('speechSynthesis' in window.parent) {{
-            window.parent.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance('{clean_speech_text}');
-            utterance.rate = 1.0;
-            utterance.pitch = 1.0;
-            window.parent.speechSynthesis.speak(utterance);
-        }}
-        </script>
-        """,
-        height=0,
-        width=0
-    )
