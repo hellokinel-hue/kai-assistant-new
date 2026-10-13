@@ -1,6 +1,7 @@
 import re
 import urllib.parse
 import streamlit as st
+import streamlit.components.v1 as components
 import sqlite3
 import hashlib
 import os
@@ -140,7 +141,7 @@ def save_message(email, role, content, session_id):
 # -----------------------------------------------------------------------------
 # 2. PAGE CONFIG & AGGRESSIVE CSS OVERRIDES
 # -----------------------------------------------------------------------------
-st.set_page_config(page_title="KAI", page_icon="✦", layout="centered", initial_sidebar_state="expanded")
+st.set_page_config(page_title="KAI", page_icon="K", layout="centered", initial_sidebar_state="expanded")
 
 st.markdown(
     """
@@ -188,6 +189,7 @@ st.markdown(
         background-color: #1e1f20 !important; border: 1px solid #333537 !important;
         border-radius: 32px !important; padding: 0.2rem 0.8rem 0.2rem 3.5rem !important; 
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+        display: flex !important; align-items: center !important;
     }
     [data-testid="stChatInput"] * {
         background-color: transparent !important; color: #e3e3e3 !important;
@@ -247,8 +249,12 @@ st.markdown(
     .st-key-attach_popover button:hover {
         background-color: #333537 !important; color: #e3e3e3 !important; border-color: transparent !important;
     }
-
-    .stRadio > div { justify-content: center !important; }
+    
+    @keyframes pulse-red {
+        0% { transform: scale(1); filter: drop-shadow(0 0 2px red); }
+        50% { transform: scale(1.15); filter: drop-shadow(0 0 8px red); }
+        100% { transform: scale(1); filter: drop-shadow(0 0 2px red); }
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -260,7 +266,6 @@ st.markdown(
 if "logged_in_user" not in st.session_state: st.session_state.logged_in_user = None
 if "messages" not in st.session_state: st.session_state.messages = []
 if "current_session_id" not in st.session_state: st.session_state.current_session_id = str(uuid.uuid4())
-if "kai_mode" not in st.session_state: st.session_state.kai_mode = "🧠 Pro"
 
 # -----------------------------------------------------------------------------
 # 4. TOP-RIGHT AUTHENTICATION / PROFILE
@@ -364,19 +369,8 @@ with st.sidebar:
         st.info("Please log in to save and view your chat history.")
 
 # -----------------------------------------------------------------------------
-# 6. MAIN CHAT UI, GREETING & MODEL TOGGLE
+# 6. MAIN CHAT UI & GREETING
 # -----------------------------------------------------------------------------
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    st.session_state.kai_mode = st.radio(
-        "AI Model",
-        ["⚡ Fast", "🧠 Pro"],
-        index=1,
-        horizontal=True,
-        label_visibility="collapsed",
-        key="model_toggle"
-    )
-
 st.markdown("<br>", unsafe_allow_html=True)
 
 if not st.session_state.messages:
@@ -412,7 +406,7 @@ for idx, message in enumerate(st.session_state.messages):
         st.markdown(
             """
             <div style="display: flex; align-items: center; gap: 0.6rem; margin-top: 1.8rem; margin-bottom: 0.4rem;">
-                <div style="width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, #4285f4, #9b72cb, #d96570); display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">✦</div>
+                <div style="width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, #4285f4, #9b72cb, #d96570); display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">K</div>
                 <span style="font-weight: 600; font-size: 0.95rem; background: linear-gradient(90deg, #a8c7fa, #c38fff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">KAI</span>
             </div>
             """,
@@ -422,7 +416,6 @@ for idx, message in enumerate(st.session_state.messages):
             st.markdown(message["content"])
             st.image(message["image_obj"], use_container_width=True)
             
-            # Convert PIL image to bytes for download button
             buf = io.BytesIO()
             message["image_obj"].save(buf, format="PNG")
             byte_im = buf.getvalue()
@@ -451,13 +444,122 @@ with st.container():
             st.success(f"Attached: {uploaded_file.name}")
 
 # -----------------------------------------------------------------------------
-# 8. CHAT INPUT HANDLER & MODEL SELECTION
+# 8. JAVASCRIPT TALK / MIC BUTTON INJECTION
+# -----------------------------------------------------------------------------
+components.html(
+    """
+    <script>
+    (function() {
+        function attachTalkButton() {
+            const doc = window.parent.document;
+            const container = doc.querySelector('[data-testid="stChatInput"]');
+            const submitBtn = doc.querySelector('[data-testid="stChatInputSubmitButton"]');
+            const textArea = doc.querySelector('[data-testid="stChatInputTextArea"]');
+            
+            if (!container || !submitBtn || doc.getElementById('kai-talk-btn')) return;
+
+            const talkBtn = doc.createElement('button');
+            talkBtn.id = 'kai-talk-btn';
+            talkBtn.innerHTML = '🎙️';
+            talkBtn.title = 'Speak to KAI';
+            talkBtn.type = 'button';
+            talkBtn.style.cssText = `
+                background: transparent;
+                border: none;
+                cursor: pointer;
+                font-size: 1.25rem;
+                padding: 6px;
+                margin-right: 6px;
+                border-radius: 50%;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #e3e3e3;
+            `;
+
+            talkBtn.onmouseover = () => { talkBtn.style.backgroundColor = '#333537'; };
+            talkBtn.onmouseout = () => { talkBtn.style.backgroundColor = 'transparent'; };
+
+            submitBtn.parentNode.insertBefore(talkBtn, submitBtn);
+
+            let recognizing = false;
+            const SpeechRecognition = window.parent.SpeechRecognition || window.parent.webkitSpeechRecognition;
+
+            if (!SpeechRecognition) {
+                talkBtn.title = "Speech recognition is not supported in this browser.";
+                talkBtn.style.opacity = "0.4";
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+
+            talkBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (recognizing) {
+                    recognition.stop();
+                    return;
+                }
+                recognition.start();
+            };
+
+            recognition.onstart = () => {
+                recognizing = true;
+                talkBtn.innerHTML = '🔴';
+                talkBtn.style.animation = 'pulse-red 1s infinite';
+            };
+
+            recognition.onresult = (event) => {
+                let transcript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    transcript += event.results[i][0].transcript;
+                }
+                if (textArea) {
+                    textArea.value = transcript;
+                    textArea.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            };
+
+            recognition.onend = () => {
+                recognizing = false;
+                talkBtn.innerHTML = '🎙️';
+                talkBtn.style.animation = 'none';
+                
+                if (textArea && textArea.value.trim() !== '') {
+                    setTimeout(() => {
+                        if (submitBtn) submitBtn.click();
+                    }, 400);
+                }
+            };
+
+            recognition.onerror = () => {
+                recognizing = false;
+                talkBtn.innerHTML = '🎙️';
+                talkBtn.style.animation = 'none';
+            };
+        }
+
+        setInterval(attachTalkButton, 800);
+    })();
+    </script>
+    """,
+    height=0,
+    width=0
+)
+
+# -----------------------------------------------------------------------------
+# 9. CHAT INPUT HANDLER & SELF-HEALING MODEL FALLBACK
 # -----------------------------------------------------------------------------
 if prompt := st.chat_input("Ask KAI anything..."):
     api_content = prompt
     display_content = prompt
     
-    model_to_use = "llama-3.3-70b-versatile"
+    # Primary & backup models list for self-healing
+    models_to_try = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"]
     
     if 'uploaded_file' in locals() and uploaded_file is not None:
         file_ext = uploaded_file.name.lower().split('.')[-1]
@@ -469,7 +571,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}}
             ]
             display_content = f"*[Attached Image: {uploaded_file.name}]*\n\n{prompt}"
-            model_to_use = "qwen/qwen3.6-27b"
+            models_to_try = ["qwen/qwen3.6-27b", "llama-3.2-11b-vision-preview"]
         else:
             try:
                 file_text = uploaded_file.getvalue().decode('utf-8')
@@ -500,7 +602,7 @@ if prompt := st.chat_input("Ask KAI anything..."):
     st.markdown(
         """
         <div style="display: flex; align-items: center; gap: 0.6rem; margin-top: 1.8rem; margin-bottom: 0.4rem;">
-            <div style="width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, #4285f4, #9b72cb, #d96570); display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">✦</div>
+            <div style="width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, #4285f4, #9b72cb, #d96570); display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">K</div>
             <span style="font-weight: 600; font-size: 0.95rem; background: linear-gradient(90deg, #a8c7fa, #c38fff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">KAI</span>
         </div>
         """,
@@ -527,9 +629,10 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 "Under NO circumstances should you mention OpenAI, Groq, Pollinations, LLMs, or being a language model. "
                 "You are simply KAI. If asked who made you, say 'Kinel de Silva'.\n\n"
                 "IMAGE GENERATION: You have the ability to generate images infinitely. If the user asks you to create, generate, draw, or show a picture/image, "
-                "you MUST include the following tag anywhere in your response: [GENERATE_IMAGE: <detailed visual description of the image>] . "
-                "Make the description inside the tag highly detailed for the best artistic result. "
-                "CRITICAL INSTRUCTION: NEVER output standard markdown image links like ![alt](url). ONLY use the [GENERATE_IMAGE:] tag."
+                "you MUST include the following tag anywhere in your response: [GENERATE_IMAGE: <detailed visual description of the image>] .\n\n"
+                "VIDEO GENERATION: If the user asks you to generate, create, or make a video, "
+                "you MUST include the following tag anywhere in your response: [GENERATE_VIDEO: <detailed prompt for video motion and visuals>] .\n\n"
+                "CRITICAL INSTRUCTION: NEVER output standard markdown image links. ONLY use the [GENERATE_IMAGE:] or [GENERATE_VIDEO:] tags."
             )
             
             full_messages = [{"role": "system", "content": ultra_strict_system_prompt}]
@@ -542,13 +645,25 @@ if prompt := st.chat_input("Ask KAI anything..."):
             
             client = Groq(api_key=st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY"))
             
-            chat_completion = client.chat.completions.create(
-                messages=full_messages,
-                model=model_to_use, 
-                temperature=0.7,
-                max_tokens=1024,
-                stream=True
-            )
+            # SELF-HEALING FALLBACK LOOP
+            chat_completion = None
+            last_error = None
+            for model_candidate in models_to_try:
+                try:
+                    chat_completion = client.chat.completions.create(
+                        messages=full_messages,
+                        model=model_candidate, 
+                        temperature=0.7,
+                        max_tokens=1024,
+                        stream=True
+                    )
+                    break # Successfully connected, exit loop!
+                except Exception as model_err:
+                    last_error = model_err
+                    continue # Try next fallback model automatically
+            
+            if chat_completion is None:
+                raise last_error
             
             for chunk in chat_completion:
                 if chunk.choices[0].delta.content is not None:
@@ -572,7 +687,6 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 unique_seed = random.randint(1, 1000000)
                 url = f"https://image.pollinations.ai/prompt/{safe_img_prompt}?nologo=true&enhance=true&model=flux&seed={unique_seed}"
                 
-                # Robust Multi-Attempt Fallback Loop to prevent timeouts
                 res = None
                 for attempt in range(3):
                     try:
@@ -622,7 +736,6 @@ if prompt := st.chat_input("Ask KAI anything..."):
                     message_placeholder.markdown(ai_reply)
                     st.image(generated_img_obj, use_container_width=True)
                     
-                    # Direct download button for newly generated image
                     buf = io.BytesIO()
                     generated_img_obj.save(buf, format="PNG")
                     st.download_button(
@@ -635,12 +748,42 @@ if prompt := st.chat_input("Ask KAI anything..."):
                 else:
                     ai_reply += "\n\n*(Error: The image forge is currently resting. Try again later.)*"
                     message_placeholder.markdown(ai_reply)
-            except requests.exceptions.Timeout:
-                ai_reply += "\n\n*(Image Generation Error: The image server is currently busy and timed out. Please try again!)*"
-                message_placeholder.markdown(ai_reply)
             except Exception as e:
                 ai_reply += "\n\n*(Image Generation Error: The image service is temporarily unavailable.)*"
                 message_placeholder.markdown(ai_reply)
+
+    generated_video_url = None
+    if "[GENERATE_VIDEO:" in ai_reply:
+        import replicate
+        match = re.search(r"\[GENERATE_VIDEO:\s*(.*?)\]", ai_reply, re.DOTALL)
+        if match:
+            video_prompt = match.group(1).strip()
+            ai_reply = re.sub(r"\[GENERATE_VIDEO:\s*.*?\]", "", ai_reply, flags=re.DOTALL).strip()
+            message_placeholder.markdown(ai_reply + "\n\n*🎬 Forging video... (This takes about 1-2 minutes)*", unsafe_allow_html=True)
+            
+            replicate_token = st.secrets.get("REPLICATE_API_TOKEN") or os.environ.get("REPLICATE_API_TOKEN")
+            if not replicate_token:
+                ai_reply += "\n\n*(System Error: REPLICATE_API_TOKEN missing. Please configure it to generate videos.)*"
+                message_placeholder.markdown(ai_reply)
+            else:
+                try:
+                    os.environ["REPLICATE_API_TOKEN"] = replicate_token
+                    output = replicate.run(
+                        "anotherjesse/zeroscope-v2-xl:9f747673945c62801b13b84701c783929c0ee784e4748ec062204894dda1a351",
+                        input={
+                            "prompt": video_prompt,
+                            "num_frames": 24,
+                            "fps": 8,
+                            "width": 1024,
+                            "height": 576
+                        }
+                    )
+                    generated_video_url = output[0] if isinstance(output, list) else output
+                    message_placeholder.markdown(ai_reply)
+                    st.video(generated_video_url)
+                except Exception as e:
+                    ai_reply += f"\n\n*(Video Generation Error: {str(e)})*"
+                    message_placeholder.markdown(ai_reply)
 
     check_reply = ai_reply.lower().replace("’", "'")
     forbidden_identities = [
@@ -653,9 +796,28 @@ if prompt := st.chat_input("Ask KAI anything..."):
         pattern = re.compile('|'.join(re.escape(phrase) for phrase in forbidden_identities), re.IGNORECASE)
         ai_reply = pattern.sub("a digital assistant", ai_reply)
 
+    msg_data = {"role": "assistant", "content": ai_reply}
     if generated_img_obj:
-        st.session_state.messages.append({"role": "assistant", "content": ai_reply, "image_obj": generated_img_obj})
-    else:
-        st.session_state.messages.append({"role": "assistant", "content": ai_reply})
+        msg_data["image_obj"] = generated_img_obj
+    if generated_video_url:
+        msg_data["content"] += f"\n\n*(Video URL: {generated_video_url})*"
         
-    save_message(st.session_state.logged_in_user, "assistant", ai_reply, st.session_state.current_session_id)
+    st.session_state.messages.append(msg_data)
+    save_message(st.session_state.logged_in_user, "assistant", msg_data["content"], st.session_state.current_session_id)
+    
+    clean_speech_text = re.sub(r'[*_`#]', '', ai_reply).replace("'", "\\'")
+    components.html(
+        f"""
+        <script>
+        if ('speechSynthesis' in window.parent) {{
+            window.parent.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance('{clean_speech_text}');
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            window.parent.speechSynthesis.speak(utterance);
+        }}
+        </script>
+        """,
+        height=0,
+        width=0
+    )
