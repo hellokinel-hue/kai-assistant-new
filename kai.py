@@ -422,7 +422,7 @@ else:
                     else: st.error("Password must be at least 6 characters.")
 
 # -----------------------------------------------------------------------------
-# 6. SIDEBAR: CHAT HISTORY & KAI VIEW AGENT MODE
+# 6. SIDEBAR: CHAT HISTORY & KAI VIEW AGENT MODE WITH ✕ CLOSE BUTTON
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("### 👁️ KAI View Agent")
@@ -431,21 +431,24 @@ with st.sidebar:
         st.rerun()
         
     if st.session_state.kai_view_active:
-        st.markdown(
-            """
-            <div style="background-color: #1e1f20; border: 1px solid #9b72cb; padding: 12px; border-radius: 12px; margin-top: 10px;">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                    <span style="width: 10px; height: 10px; background-color: #d96570; border-radius: 50%; display: inline-block; animation: pulse 1.5s infinite;"></span>
-                    <strong style="color: #ffffff; font-size: 0.9rem;">Status Notch: Active</strong>
+        col_notch_text, col_notch_close = st.columns([0.8, 0.2])
+        with col_notch_text:
+            st.markdown(
+                """
+                <div style="background-color: #1e1f20; border: 1px solid #9b72cb; padding: 10px; border-radius: 12px; margin-top: 6px;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                        <span style="width: 8px; height: 8px; background-color: #d96570; border-radius: 50%; display: inline-block;"></span>
+                        <strong style="color: #ffffff; font-size: 0.85rem;">Notch: Active</strong>
+                    </div>
+                    <p style="color: #8e9196; font-size: 0.75rem; margin: 0;">Scanning display. Touch/cursor move triggers kill-switch.</p>
                 </div>
-                <p style="color: #8e9196; font-size: 0.8rem; margin: 0;">Scanning live display. Any cursor movement or screen touch will instantly trigger the <strong>safety kill-switch</strong>.</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        if st.button("🛑 Disengage Kill-Switch / Close", use_container_width=True, type="secondary"):
-            st.session_state.kai_view_active = False
-            st.rerun()
+                """,
+                unsafe_allow_html=True
+            )
+        with col_notch_close:
+            if st.button("✕", key="close_kai_view", help="Turn off KAI View"):
+                st.session_state.kai_view_active = False
+                st.rerun()
 
     st.markdown("---")
     st.markdown("### 💬 Chat History")
