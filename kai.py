@@ -12,6 +12,7 @@ import io
 import random
 import requests
 import smtplib
+import zipfile
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from PIL import Image, ImageDraw, ImageFont
@@ -422,50 +423,40 @@ else:
                     else: st.error("Password must be at least 6 characters.")
 
 # -----------------------------------------------------------------------------
-# 6. SIDEBAR: NATIVE FILE DOWNLOAD BUTTONS, CHAT HISTORY & KAI VIEW AGENT
+# 6. SIDEBAR: SINGLE ZIP DOWNLOAD PACKAGE, CHAT HISTORY & KAI VIEW AGENT
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    # --- DOWNLOAD KAI FILES NATIVELY ---
-    with st.popover("📥 Download KAI Files", use_container_width=True):
-        st.markdown("### Direct File Downloads")
-        st.markdown("Click below to download files directly:")
+    # --- DOWNLOAD KAI SINGLE ZIP PACKAGE ---
+    with st.popover("📥 Download KAI Package", use_container_width=True):
+        st.markdown("### Get KAI Desktop App")
+        st.markdown("Download everything in one convenient package:")
         
-        # Batch launcher content
-        bat_content = """@echo off
+        # Build in-memory zip file containing kai.py and Run_KAI.bat
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            try:
+                with open(__file__, "r", encoding="utf-8") as f:
+                    code_data = f.read()
+            except Exception:
+                code_data = "# KAI Source Code"
+            zip_file.writestr("kai.py", code_data)
+            
+            bat_content = """@echo off
 title KAI Assistant Launcher
-echo ========================================
-echo         STARTING KAI ASSISTANT
-echo ========================================
-echo.
-echo Installing/checking dependencies...
+echo Starting KAI Assistant...
 python -m pip install -r requirements.txt >nul 2>&1
-echo.
-echo Launching KAI web application...
 python -m streamlit run kai.py
 pause
 """
-        # Native Streamlit download button for Run_KAI.bat
-        st.download_button(
-            label="⚡ Download Run_KAI.bat",
-            data=bat_content,
-            file_name="Run_KAI.bat",
-            mime="text/plain",
-            use_container_width=True
-        )
+            zip_file.writestr("Run_KAI.bat", bat_content)
+            
+        zip_bytes = zip_buffer.getvalue()
         
-        # Read current script data for direct file download
-        try:
-            with open(__file__, "r", encoding="utf-8") as f:
-                current_code = f.read()
-        except Exception:
-            current_code = "# KAI Source Code"
-
-        # Native Streamlit download button for kai.py
         st.download_button(
-            label="📄 Download kai.py",
-            data=current_code,
-            file_name="kai.py",
-            mime="text/plain",
+            label="📦 Download KAI_App.zip",
+            data=zip_bytes,
+            file_name="KAI_App.zip",
+            mime="application/zip",
             use_container_width=True
         )
 
