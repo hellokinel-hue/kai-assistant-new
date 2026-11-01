@@ -422,19 +422,32 @@ else:
                     else: st.error("Password must be at least 6 characters.")
 
 # -----------------------------------------------------------------------------
-# 6. SIDEBAR: DOWNLOAD APP, CHAT HISTORY & KAI VIEW AGENT
+# 6. SIDEBAR: DOWNLOAD LAUNCHER & FILES, CHAT HISTORY & KAI VIEW AGENT
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    # --- DOWNLOAD KAI APP PACKAGE (NO ADMIN BLOCKS) ---
+    # --- DOWNLOAD KAI LAUNCHER & FILES ---
     with st.popover("📥 Download KAI Package", use_container_width=True):
-        st.markdown("### Get KAI Desktop Package")
-        st.markdown("Download the complete launcher package for Windows:")
+        st.markdown("### Get KAI Launcher")
+        st.markdown("Download direct files from your repository:")
         
+        # Download Run_KAI.bat directly
         st.markdown(
             """
-            <a href="https://github.com/hellokinel-hue/kai-assistant-new/raw/main/KAI_App.zip" target="_blank" style="text-decoration: none;">
-                <div style="background: linear-gradient(135deg, #4285f4 0%, #9b72cb 50%, #d96570 100%); color: white; padding: 12px 18px; border-radius: 20px; text-align: center; font-weight: 700; font-size: 0.95rem; box-shadow: 0 4px 12px rgba(155, 114, 203, 0.4); display: block;">
-                    📦 Download KAI Package (.zip)
+            <a href="https://raw.githubusercontent.com/hellokinel-hue/kai-assistant-new/main/Run_KAI.bat" target="_blank" style="text-decoration: none;">
+                <div style="background: linear-gradient(135deg, #4285f4 0%, #9b72cb 50%, #d96570 100%); color: white; padding: 12px 18px; border-radius: 20px; text-align: center; font-weight: 700; font-size: 0.95rem; box-shadow: 0 4px 12px rgba(155, 114, 203, 0.4); display: block; margin-bottom: 8px;">
+                    ⚡ Download Run_KAI.bat
+                </div>
+            </a>
+            """,
+            unsafe_allow_html=True
+        )
+        
+        # Download kai.py directly
+        st.markdown(
+            """
+            <a href="https://raw.githubusercontent.com/hellokinel-hue/kai-assistant-new/main/kai.py" target="_blank" style="text-decoration: none;">
+                <div style="background-color: #282a2c; color: #e3e3e3; border: 1px solid #333537; padding: 8px 16px; border-radius: 20px; text-align: center; font-weight: 600; font-size: 0.85rem; display: block;">
+                    📄 Download kai.py
                 </div>
             </a>
             """,
