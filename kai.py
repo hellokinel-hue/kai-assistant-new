@@ -423,42 +423,53 @@ else:
                     else: st.error("Password must be at least 6 characters.")
 
 # -----------------------------------------------------------------------------
-# 6. SIDEBAR: SINGLE ZIP DOWNLOAD PACKAGE, CHAT HISTORY & KAI VIEW AGENT
+# 6. SIDEBAR: PLATFORM SELECTOR, DOWNLOADS, CHAT HISTORY & KAI VIEW AGENT
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    # --- DOWNLOAD KAI APP ZIP NATIVELY ---
-    with st.popover("📥 Download KAI Package", use_container_width=True):
-        st.markdown("### Get KAI App Bundle")
-        st.markdown("Download everything in one convenient package:")
+    # --- DOWNLOAD KAI APP (WITH PLATFORM SELECTOR) ---
+    with st.popover("📥 Download KAI App", use_container_width=True):
+        st.markdown("### Choose Your Platform")
+        platform = st.radio("Select Device:", ["Windows", "Android", "iOS"], key="os_selector")
         
-        # Automatically bundle kai.py and the batch launcher into an in-memory zip
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-            try:
-                with open(__file__, "r", encoding="utf-8") as f:
-                    code_data = f.read()
-            except Exception:
-                code_data = "# KAI Source Code"
-            zip_file.writestr("kai.py", code_data)
+        st.markdown("---")
+        
+        if platform == "Windows":
+            st.markdown("Get the desktop package for Windows:")
             
-            bat_content = """@echo off
+            # In-memory zip build for Windows
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                try:
+                    with open(__file__, "r", encoding="utf-8") as f:
+                        code_data = f.read()
+                except Exception:
+                    code_data = "# KAI Source Code"
+                zip_file.writestr("kai.py", code_data)
+                
+                bat_content = """@echo off
 title KAI Assistant Launcher
 echo Starting KAI Assistant...
 python -m pip install -r requirements.txt >nul 2>&1
 python -m streamlit run kai.py
 pause
 """
-            zip_file.writestr("Run_KAI.bat", bat_content)
+                zip_file.writestr("Run_KAI.bat", bat_content)
+                
+            st.download_button(
+                label="📦 Download Windows App",
+                data=zip_buffer.getvalue(),
+                file_name="KAI_Windows_App.zip",
+                mime="application/zip",
+                use_container_width=True
+            )
             
-        zip_bytes = zip_buffer.getvalue()
-        
-        st.download_button(
-            label="📦 Download KAI_App.zip",
-            data=zip_bytes,
-            file_name="KAI_App.zip",
-            mime="application/zip",
-            use_container_width=True
-        )
+        elif platform == "Android":
+            st.markdown("Android Setup:")
+            st.info("On Android, open this web app in Chrome and tap **'Add to Home screen'** from the browser menu for an app-like experience!")
+            
+        elif platform == "iOS":
+            st.markdown("iOS (iPhone/iPad) Setup:")
+            st.info("On iOS, open this web app in Safari, tap the **Share** button, and select **'Add to Home Screen'** for instant app launching!")
 
     st.markdown("---")
     st.markdown("### 👁️ KAI View Agent")
