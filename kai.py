@@ -12,6 +12,7 @@ import io
 import random
 import requests
 import smtplib
+import zipfile
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from PIL import Image, ImageDraw, ImageFont
@@ -422,23 +423,41 @@ else:
                     else: st.error("Password must be at least 6 characters.")
 
 # -----------------------------------------------------------------------------
-# 6. SIDEBAR: STANDALONE EXECUTABLE DOWNLOAD, CHAT HISTORY & KAI VIEW AGENT
+# 6. SIDEBAR: SINGLE ZIP DOWNLOAD PACKAGE, CHAT HISTORY & KAI VIEW AGENT
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    # --- DOWNLOAD KAI EXECUTABLE APP ---
-    with st.popover("📥 Download KAI App", use_container_width=True):
-        st.markdown("### Standalone Desktop App")
-        st.markdown("Download `kai.exe` for instant one-click launching:")
+    # --- DOWNLOAD KAI APP ZIP NATIVELY ---
+    with st.popover("📥 Download KAI Package", use_container_width=True):
+        st.markdown("### Get KAI App Bundle")
+        st.markdown("Download everything in one convenient package:")
         
-        st.markdown(
-            """
-            <a href="https://github.com/hellokinel-hue/kai-assistant-new/releases/latest/download/kai.exe" target="_blank" style="text-decoration: none;">
-                <div style="background: linear-gradient(135deg, #4285f4 0%, #9b72cb 50%, #d96570 100%); color: white; padding: 12px 18px; border-radius: 20px; text-align: center; font-weight: 700; font-size: 0.95rem; box-shadow: 0 4px 12px rgba(155, 114, 203, 0.4); display: block;">
-                    💻 Download kai.exe
-                </div>
-            </a>
-            """,
-            unsafe_allow_html=True
+        # Automatically bundle kai.py and the batch launcher into an in-memory zip
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            try:
+                with open(__file__, "r", encoding="utf-8") as f:
+                    code_data = f.read()
+            except Exception:
+                code_data = "# KAI Source Code"
+            zip_file.writestr("kai.py", code_data)
+            
+            bat_content = """@echo off
+title KAI Assistant Launcher
+echo Starting KAI Assistant...
+python -m pip install -r requirements.txt >nul 2>&1
+python -m streamlit run kai.py
+pause
+"""
+            zip_file.writestr("Run_KAI.bat", bat_content)
+            
+        zip_bytes = zip_buffer.getvalue()
+        
+        st.download_button(
+            label="📦 Download KAI_App.zip",
+            data=zip_bytes,
+            file_name="KAI_App.zip",
+            mime="application/zip",
+            use_container_width=True
         )
 
     st.markdown("---")
