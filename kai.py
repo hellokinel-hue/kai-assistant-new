@@ -422,9 +422,26 @@ else:
                     else: st.error("Password must be at least 6 characters.")
 
 # -----------------------------------------------------------------------------
-# 6. SIDEBAR: CHAT HISTORY & KAI VIEW AGENT MODE WITH ✕ CLOSE BUTTON
+# 6. SIDEBAR: DOWNLOAD APP, CHAT HISTORY & KAI VIEW AGENT
 # -----------------------------------------------------------------------------
 with st.sidebar:
+    # --- DOWNLOAD KAI APP PACKAGE (NO ADMIN BLOCKS) ---
+    with st.popover("📥 Download KAI Package", use_container_width=True):
+        st.markdown("### Get KAI Desktop Package")
+        st.markdown("Download the complete launcher package for Windows:")
+        
+        st.markdown(
+            """
+            <a href="https://github.com/hellokinel-hue/kai-assistant-new/raw/main/KAI_App.zip" target="_blank" style="text-decoration: none;">
+                <div style="background: linear-gradient(135deg, #4285f4 0%, #9b72cb 50%, #d96570 100%); color: white; padding: 12px 18px; border-radius: 20px; text-align: center; font-weight: 700; font-size: 0.95rem; box-shadow: 0 4px 12px rgba(155, 114, 203, 0.4); display: block;">
+                    📦 Download KAI Package (.zip)
+                </div>
+            </a>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.markdown("---")
     st.markdown("### 👁️ KAI View Agent")
     if st.button("⚡ KAI View (Live Screen Mode)", use_container_width=True, type="primary"):
         st.session_state.kai_view_active = not st.session_state.kai_view_active
