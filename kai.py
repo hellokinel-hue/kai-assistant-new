@@ -465,7 +465,24 @@ pause
             
         elif platform == "Android":
             st.markdown("Android Setup:")
-            st.info("On Android, open this web app in Chrome and tap **'Add to Home screen'** from the browser menu for an app-like experience!")
+            st.markdown("Download the official KAI Android app package directly to your device.")
+            
+            apk_path = "kai_app.apk"
+            if os.path.exists(apk_path):
+                with open(apk_path, "rb") as apk_file:
+                    apk_data = apk_file.read()
+                    
+                st.download_button(
+                    label="📦 Download Android APK",
+                    data=apk_data,
+                    file_name="KAI_Assistant.apk",
+                    mime="application/vnd.android.package-archive",
+                    use_container_width=True,
+                    type="primary"
+                )
+            else:
+                st.error("⚠️ APK file not found on the server.")
+                st.caption("Place 'kai_app.apk' in your repository root folder.")
             
         elif platform == "iOS":
             st.markdown("iOS (iPhone/iPad) Setup:")
@@ -781,3 +798,5 @@ if prompt := st.chat_input("Ask KAI anything..."):
         
     st.session_state.messages.append(msg_data)
     save_message(st.session_state.logged_in_user, "assistant", msg_data["content"], st.session_state.current_session_id)
+    GROQ_API_KEY = "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"
+REPLICATE_API_TOKEN = "r8_FeTEv9RHNDPR7am3C8H4N9fJ889Gobn2qKGKd"
