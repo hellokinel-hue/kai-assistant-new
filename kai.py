@@ -798,5 +798,4 @@ if prompt := st.chat_input("Ask KAI anything..."):
         
     st.session_state.messages.append(msg_data)
     save_message(st.session_state.logged_in_user, "assistant", msg_data["content"], st.session_state.current_session_id)
-    GROQ_API_KEY = "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"
-REPLICATE_API_TOKEN = "r8_FeTEv9RHNDPR7am3C8H4N9fJ889Gobn2qKGKd"
+    
