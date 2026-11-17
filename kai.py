@@ -13,10 +13,12 @@ import random
 import requests
 import smtplib
 import zipfile
+import sys
+from contextlib import redirect_stdout
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from PIL import Image, ImageDraw, ImageFont
-from groq import Groq  
+from google import genai
 
 # -----------------------------------------------------------------------------
 # 1. DATABASE SETUP & SECURITY
@@ -98,7 +100,7 @@ def send_kai_email(to_email, subject, html_body):
 def send_welcome_email(to_email):
     subject = "Welcome to KAI — Your Digital Assistant"
     html_body = f"""
-    <div style="background-color: #131314; color: #e3e3e3; padding: 30px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border-radius: 12px;">
+    <div style="background-color: #131314; color: #e3e3e3; padding: 30px; font-family: 'Segoe UI', sans-serif; border-radius: 12px;">
         <div style="text-align: center; margin-bottom: 20px;">
             <h1 style="background: linear-gradient(74deg, #4285f4 0%, #9b72cb 35%, #d96570 70%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 2.5rem; margin: 0;">KAI</h1>
             <p style="color: #8e9196; font-size: 1rem;">Exclusive Digital Assistant</p>
@@ -106,7 +108,7 @@ def send_welcome_email(to_email):
         <div style="background-color: #1e1f20; padding: 25px; border-radius: 12px; border: 1px solid #333537;">
             <h2 style="color: #ffffff; margin-top: 0;">Welcome aboard!</h2>
             <p>Hello <code>{to_email}</code>,</p>
-            <p>Your account has been successfully created. You now have full access to high-speed text reasoning, custom watermarked image generation, and secure cloud memory.</p>
+            <p>Your account has been successfully created. You now have full access to high-speed text reasoning and live code execution.</p>
             <p style="margin-top: 25px; color: #8e9196; font-size: 0.9rem;">Developed by Kinel de Silva.</p>
         </div>
     </div>
@@ -121,7 +123,6 @@ def send_login_notification_email(to_email):
             <h2 style="color: #4285f4; margin-top: 0;">Successful Login Notification</h2>
             <p>Hello <code>{to_email}</code>,</p>
             <p>We detected a successful login to your KAI account.</p>
-            <p style="color: #8e9196; font-size: 0.85rem; margin-top: 20px;">If this was you, no action is needed.</p>
         </div>
     </div>
     """
@@ -133,12 +134,10 @@ def send_password_reset_email(to_email, reset_code):
     <div style="background-color: #131314; color: #e3e3e3; padding: 30px; font-family: 'Segoe UI', sans-serif; border-radius: 12px;">
         <div style="background-color: #1e1f20; padding: 25px; border-radius: 12px; border: 1px solid #333537;">
             <h2 style="color: #d96570; margin-top: 0;">Password Reset Code</h2>
-            <p>You requested a password reset for your KAI account (<code>{to_email}</code>).</p>
             <p>Your secure verification code is:</p>
-            <div style="background-color: #282a2c; padding: 15px; text-align: center; font-size: 1.8rem; font-weight: bold; letter-spacing: 3px; color: #a8c7fa; border-radius: 8px; margin: 20px 0;">
+            <div style="background-color: #282a2c; padding: 15px; text-align: center; font-size: 1.8rem; font-weight: bold; color: #a8c7fa; border-radius: 8px; margin: 20px 0;">
                 {reset_code}
             </div>
-            <p style="color: #8e9196; font-size: 0.85rem;">If you did not request this, please ignore this email.</p>
         </div>
     </div>
     """
@@ -172,8 +171,7 @@ def verify_user(email, password):
         stored_hash, salt = result[0], result[1]
         if salt is None: return False 
         computed_hash, _ = hash_password(password, salt)
-        if stored_hash == computed_hash:
-            return True
+        if stored_hash == computed_hash: return True
     return False
 
 def request_password_reset(email):
@@ -411,391 +409,4 @@ else:
                 if st.button("Send Reset Code", use_container_width=True):
                     res = request_password_reset(reset_email)
                     if res == "success": st.success("Reset code sent to your email!")
-                    elif res == "not_found": st.error("Email not found.")
-                    else: st.error("Invalid email format.")
-                
-                reset_code_input = st.text_input("6-Digit Code", key="reset_code_input")
-                new_pass_input = st.text_input("New Password", type="password", key="new_pass_input")
-                if st.button("Confirm Reset Password", use_container_width=True, type="primary"):
-                    res = reset_user_password_with_code(reset_email, reset_code_input, new_pass_input)
-                    if res == "success": st.success("Password successfully updated! Switch to 'Log In'.")
-                    elif res == "invalid_code": st.error("Invalid verification code.")
-                    else: st.error("Password must be at least 6 characters.")
-
-# -----------------------------------------------------------------------------
-# 6. SIDEBAR: PLATFORM SELECTOR, DOWNLOADS, CHAT HISTORY & KAI VIEW AGENT
-# -----------------------------------------------------------------------------
-with st.sidebar:
-    # --- DOWNLOAD KAI APP (WITH PLATFORM SELECTOR) ---
-    with st.popover("📥 Download KAI App", use_container_width=True):
-        st.markdown("### Choose Your Platform")
-        platform = st.radio("Select Device:", ["Windows", "Android", "iOS"], key="os_selector")
-        
-        st.markdown("---")
-        
-        if platform == "Windows":
-            st.markdown("Get the desktop package for Windows:")
             
-            # In-memory zip build for Windows
-            zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-                try:
-                    with open(__file__, "r", encoding="utf-8") as f:
-                        code_data = f.read()
-                except Exception:
-                    code_data = "# KAI Source Code"
-                zip_file.writestr("kai.py", code_data)
-                
-                bat_content = """@echo off
-title KAI Assistant Launcher
-echo Starting KAI Assistant...
-python -m pip install -r requirements.txt >nul 2>&1
-python -m streamlit run kai.py
-pause
-"""
-                zip_file.writestr("Run_KAI.bat", bat_content)
-                
-            st.download_button(
-                label="📦 Download Windows App",
-                data=zip_buffer.getvalue(),
-                file_name="KAI_Windows_App.zip",
-                mime="application/zip",
-                use_container_width=True
-            )
-            
-        elif platform == "Android":
-            st.markdown("Android Setup:")
-            st.markdown("Download the official KAI Android app package directly to your device.")
-            
-            apk_path = "kai_app.apk"
-            if os.path.exists(apk_path):
-                with open(apk_path, "rb") as apk_file:
-                    apk_data = apk_file.read()
-                    
-                st.download_button(
-                    label="📦 Download Android APK",
-                    data=apk_data,
-                    file_name="KAI_Assistant.apk",
-                    mime="application/vnd.android.package-archive",
-                    use_container_width=True,
-                    type="primary"
-                )
-            else:
-                st.error("⚠️ APK file not found on the server.")
-                st.caption("Place 'kai_app.apk' in your repository root folder.")
-            
-        elif platform == "iOS":
-            st.markdown("iOS (iPhone/iPad) Setup:")
-            st.info("On iOS, open this web app in Safari, tap the **Share** button, and select **'Add to Home Screen'** for instant app launching!")
-
-    st.markdown("---")
-    st.markdown("### 👁️ KAI View Agent")
-    if st.button("⚡ KAI View (Live Screen Mode)", use_container_width=True, type="primary"):
-        st.session_state.kai_view_active = not st.session_state.kai_view_active
-        st.rerun()
-        
-    if st.session_state.kai_view_active:
-        col_notch_text, col_notch_close = st.columns([0.8, 0.2])
-        with col_notch_text:
-            st.markdown(
-                """
-                <div style="background-color: #1e1f20; border: 1px solid #9b72cb; padding: 10px; border-radius: 12px; margin-top: 6px;">
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                        <span style="width: 8px; height: 8px; background-color: #d96570; border-radius: 50%; display: inline-block;"></span>
-                        <strong style="color: #ffffff; font-size: 0.85rem;">Notch: Active</strong>
-                    </div>
-                    <p style="color: #8e9196; font-size: 0.75rem; margin: 0;">Scanning display. Touch/cursor move triggers kill-switch.</p>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-        with col_notch_close:
-            if st.button("✕", key="close_kai_view", help="Turn off KAI View"):
-                st.session_state.kai_view_active = False
-                st.rerun()
-
-    st.markdown("---")
-    st.markdown("### 💬 Chat History")
-    
-    if st.session_state.logged_in_user:
-        if st.button("➕ New Chat", use_container_width=True, type="secondary"):
-            st.session_state.current_session_id = str(uuid.uuid4())
-            st.session_state.messages = []
-            st.rerun()
-            
-        st.markdown("---")
-        
-        user_chats = get_user_chats(st.session_state.logged_in_user)
-        if user_chats:
-            for chat in user_chats:
-                is_active = chat['session_id'] == st.session_state.current_session_id
-                btn_label = f"🟢 {chat['title']}" if is_active else f"📝 {chat['title']}"
-                
-                if st.button(btn_label, key=f"chat_{chat['session_id']}", use_container_width=True, type="secondary"):
-                    st.session_state.current_session_id = chat['session_id']
-                    st.session_state.messages = load_chat_history(chat['session_id'])
-                    st.rerun()
-        else:
-            st.caption("No chat history saved yet.")
-    else:
-        st.info("Please log in to save and view your chat history.")
-
-# -----------------------------------------------------------------------------
-# 7. MAIN CHAT UI & GREETING
-# -----------------------------------------------------------------------------
-st.markdown("<br>", unsafe_allow_html=True)
-
-if not st.session_state.messages:
-    greeting_subtext = (
-        f"Ready for a new chat, **{st.session_state.logged_in_user}**?" 
-        if st.session_state.logged_in_user 
-        else "How can I help you today? *(Guest Mode - chats won't be saved)*"
-    )
-    st.markdown(
-        f"""
-        <div style="text-align: center; margin-top: 2vh; margin-bottom: 5vh;">
-            <h1 style="font-size: 3.5rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 0.2rem; background: linear-gradient(74deg, #4285f4 0%, #9b72cb 35%, #d96570 70%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Hello, I'm KAI</h1>
-            <p style="color: #8e9196; font-size: 1.2rem; font-weight: 500; margin-top: 0;">{greeting_subtext}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-for idx, message in enumerate(st.session_state.messages):
-    if message["role"] == "user":
-        safe_text = html.escape(message["content"]).replace("\n", "<br>")
-        st.markdown(
-            f"""
-            <div style="display: flex; justify-content: flex-end; margin: 1.5rem 0;">
-                <div style="background-color: #282a2c; color: #e3e3e3; padding: 0.8rem 1.4rem; border-radius: 24px; border-bottom-right-radius: 4px; max-width: 80%; font-size: 1rem; line-height: 1.5;">
-                    {safe_text}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            """
-            <div style="display: flex; align-items: center; gap: 0.6rem; margin-top: 1.8rem; margin-bottom: 0.4rem;">
-                <div style="width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, #4285f4, #9b72cb, #d96570); display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">K</div>
-                <span style="font-weight: 600; font-size: 0.95rem; background: linear-gradient(90deg, #a8c7fa, #c38fff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">KAI</span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        if isinstance(message.get("image_obj"), Image.Image):
-            st.markdown(message["content"])
-            st.image(message["image_obj"], use_container_width=True)
-            
-            buf = io.BytesIO()
-            message["image_obj"].save(buf, format="PNG")
-            byte_im = buf.getvalue()
-            
-            st.download_button(
-                label="📥 Download Image",
-                data=byte_im,
-                file_name="kai_generated_image.png",
-                mime="image/png",
-                key=f"download_history_{idx}"
-            )
-        else:
-            st.markdown(message["content"], unsafe_allow_html=True) 
-
-# -----------------------------------------------------------------------------
-# 8. CHAT INPUT HANDLER & HIGH-PERFORMANCE MODEL FALLBACK
-# -----------------------------------------------------------------------------
-if prompt := st.chat_input("Ask KAI anything..."):
-    api_content = prompt
-    display_content = prompt
-    
-    models_to_try = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"]
-
-    if not st.session_state.messages and st.session_state.logged_in_user:
-        title = prompt[:25] + "..." if len(prompt) > 25 else prompt
-        create_chat(st.session_state.logged_in_user, st.session_state.current_session_id, title)
-        
-    st.session_state.messages.append({"role": "user", "content": display_content})
-    save_message(st.session_state.logged_in_user, "user", display_content, st.session_state.current_session_id)
-    
-    safe_prompt = html.escape(display_content).replace("\n", "<br>")
-    st.markdown(
-        f"""
-        <div style="display: flex; justify-content: flex-end; margin: 1.5rem 0;">
-            <div style="background-color: #282a2c; color: #e3e3e3; padding: 0.8rem 1.4rem; border-radius: 24px; border-bottom-right-radius: 4px; max-width: 80%; font-size: 1rem; line-height: 1.5;">
-                {safe_prompt}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        """
-        <div style="display: flex; align-items: center; gap: 0.6rem; margin-top: 1.8rem; margin-bottom: 0.4rem;">
-            <div style="width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, #4285f4, #9b72cb, #d96570); display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">K</div>
-            <span style="font-weight: 600; font-size: 0.95rem; background: linear-gradient(90deg, #a8c7fa, #c38fff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">KAI</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    
-    message_placeholder = st.empty()
-    clean_prompt = prompt.strip().lower()
-    
-    creator_pattern = r"(who|what).*(made|created|built|programmed|designed|developed|creator|architect).*(you|kai)"
-    identity_pattern = r"(are you|what are you|know the truth|bot|chatgpt|openai|language model|llm|machine learning|who is kai)"
-    
-    if re.search(creator_pattern, clean_prompt):
-        ai_reply = "I was developed entirely from scratch by Kinel de Silva."
-        message_placeholder.markdown(ai_reply)
-    elif re.search(identity_pattern, clean_prompt):
-        ai_reply = "I am KAI, a unique digital assistant built by Kinel de Silva. I am not a standard language model."
-        message_placeholder.markdown(ai_reply)
-    else:
-        ai_reply = ""
-        try:
-            ultra_strict_system_prompt = (
-                "IMPORTANT: You are KAI, an exclusive digital assistant built completely from scratch by a human developer named Kinel de Silva. "
-                "Under NO circumstances should you mention OpenAI, Groq, Pollinations, LLMs, or being a language model. "
-                "You are simply KAI. If asked who made you, say 'Kinel de Silva'.\n\n"
-                "IMAGE GENERATION: You have the ability to generate images infinitely. If the user asks you to create, generate, draw, or show a picture/image, "
-                "you MUST include the following tag anywhere in your response: [GENERATE_IMAGE: <detailed visual description of the image>] .\n\n"
-                "CRITICAL INSTRUCTION: NEVER output standard markdown image links. ONLY use the [GENERATE_IMAGE:] tag."
-            )
-            
-            full_messages = [{"role": "system", "content": ultra_strict_system_prompt}]
-            
-            for msg in st.session_state.messages[:-1]: 
-                clean_content = re.sub(r'<br><br><img src="data:image[^>]+>', '\n\n*[Previous Image Generated Here]*', msg["content"])
-                full_messages.append({"role": msg["role"], "content": clean_content})
-                
-            full_messages.append({"role": "user", "content": api_content})
-            
-            client = Groq(api_key=st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY"))
-            
-            chat_completion = None
-            last_error = None
-            for model_candidate in models_to_try:
-                try:
-                    chat_completion = client.chat.completions.create(
-                        messages=full_messages,
-                        model=model_candidate, 
-                        temperature=0.7,
-                        max_tokens=1024,
-                        stream=True
-                    )
-                    break 
-                except Exception as model_err:
-                    last_error = model_err
-                    continue 
-            
-            if chat_completion is None:
-                raise last_error
-            
-            for chunk in chat_completion:
-                if chunk.choices[0].delta.content is not None:
-                    ai_reply += chunk.choices[0].delta.content
-                    message_placeholder.markdown(ai_reply + "▌", unsafe_allow_html=True)
-
-        except Exception as e:
-            ai_reply = f"Connection failed. Please check your API key configuration. Details: {str(e)}"
-            message_placeholder.markdown(ai_reply)
-
-    generated_img_obj = None
-    if "[GENERATE_IMAGE:" in ai_reply:
-        match = re.search(r"\[GENERATE_IMAGE:\s*(.*?)\]", ai_reply, re.DOTALL)
-        if match:
-            image_prompt = match.group(1).strip()
-            ai_reply = re.sub(r"\[GENERATE_IMAGE:\s*.*?\]", "", ai_reply, flags=re.DOTALL).strip()
-            message_placeholder.markdown(ai_reply + "\n\n*🎨 Forging your image...*", unsafe_allow_html=True)
-            
-            try:
-                safe_img_prompt = urllib.parse.quote(image_prompt)
-                unique_seed = random.randint(1, 1000000)
-                url = f"https://image.pollinations.ai/prompt/{safe_img_prompt}?nologo=true&enhance=true&model=flux&seed={unique_seed}"
-                
-                res = None
-                for attempt in range(3):
-                    try:
-                        res = requests.get(url, timeout=30)
-                        if res.status_code == 200:
-                            break
-                    except Exception:
-                        pass
-                
-                if res and res.status_code == 200:
-                    img = Image.open(io.BytesIO(res.content))
-                    w, h = img.size
-                    img = img.crop((0, 0, w, h - 38))
-                    
-                    draw = ImageDraw.Draw(img)
-                    font_path = os.path.join(LOCAL_DB_DIR, "Roboto-Black.ttf")
-                    if not os.path.exists(font_path):
-                        try:
-                            font_url = "https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Black.ttf"
-                            r = requests.get(font_url, allow_redirects=True)
-                            open(font_path, 'wb').write(r.content)
-                        except Exception:
-                            pass
-                    
-                    try:
-                        font = ImageFont.truetype(font_path, 42)
-                    except Exception:
-                        try:
-                            font = ImageFont.truetype("arial.ttf", 42)
-                        except Exception:
-                            font = ImageFont.load_default()
-                    
-                    text = "KAI"
-                    try:
-                        bbox = draw.textbbox((0, 0), text, font=font)
-                        tw = bbox[2] - bbox[0]
-                        th = bbox[3] - bbox[1]
-                    except AttributeError:
-                        tw, th = draw.textsize(text, font=font)
-                    
-                    x, y = img.size[0] - tw - 20, 20
-                    for offset_x in [-2, -1, 0, 1, 2]:
-                        for offset_y in [-2, -1, 0, 1, 2]:
-                            draw.text((x+offset_x, y+offset_y), text, font=font, fill="black")
-                    draw.text((x, y), text, font=font, fill="white")
-                    
-                    generated_img_obj = img
-                    message_placeholder.markdown(ai_reply)
-                    st.image(generated_img_obj, use_container_width=True)
-                    
-                    buf = io.BytesIO()
-                    generated_img_obj.save(buf, format="PNG")
-                    st.download_button(
-                        label="⬇️ Download Image",
-                        data=buf.getvalue(),
-                        file_name="kai_generated_image.png",
-                        mime="image/png",
-                        key=f"download_current_{str(uuid.uuid4())}"
-                    )
-                else:
-                    ai_reply += "\n\n*(Error: The image forge is currently resting. Try again later.)*"
-                    message_placeholder.markdown(ai_reply)
-            except Exception as e:
-                ai_reply += "\n\n*(Image Generation Error: The image service is temporarily unavailable.)*"
-                message_placeholder.markdown(ai_reply)
-
-    check_reply = ai_reply.lower().replace("’", "'")
-    forbidden_identities = [
-        "an ai language model", "a language model", "created by openai",
-        "developed by openai", "built by openai", "made by openai",
-        "created by ai", "made by an ai", "i'm an ai", "i am an ai",
-        "as an ai", "as a language model", "groq"
-    ]
-    if any(bad_phrase in check_reply for bad_phrase in forbidden_identities):
-        pattern = re.compile('|'.join(re.escape(phrase) for phrase in forbidden_identities), re.IGNORECASE)
-        ai_reply = pattern.sub("a digital assistant", ai_reply)
-
-    msg_data = {"role": "assistant", "content": ai_reply}
-    if generated_img_obj:
-        msg_data["image_obj"] = generated_img_obj
-        
-    st.session_state.messages.append(msg_data)
-    save_message(st.session_state.logged_in_user, "assistant", msg_data["content"], st.session_state.current_session_id)
-    
